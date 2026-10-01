@@ -1,0 +1,2312 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KLIC Boorprofiel v41 – werkend PDF-voorbeeld</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+ integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#17202a}
+header{background:#17365d;color:#fff;padding:14px 18px}
+header h1{margin:0;font-size:20px} header p{margin:4px 0 0;font-size:12px;opacity:.85}
+.layout{display:grid;grid-template-columns:360px 1fr;gap:14px;max-width:1450px;margin:auto;padding:14px}
+.card{background:#fff;border:1px solid #d8dde3;border-radius:10px;padding:14px;margin-bottom:14px}
+h2{font-size:16px;margin:0 0 10px}label{display:block;font-weight:700;font-size:13px;margin:8px 0 5px}
+input,button{font:inherit}input{width:100%;padding:10px;border:1px solid #c7ced8;border-radius:7px}
+button{width:100%;padding:10px;border:0;border-radius:7px;background:#0969d5;color:#fff;font-weight:700;cursor:pointer;margin-top:8px}
+button.gray{background:#64748b}button:disabled{opacity:.5}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.status{background:#eef4ff;border-radius:7px;padding:9px;margin-top:8px;font-size:13px}
+.note{font-size:12px;color:#5d6875;line-height:1.4}.result{padding:9px;border-bottom:1px solid #eee;cursor:pointer}.result:hover{background:#f4f8fd}
+#map{height:650px;border-radius:9px;overflow:hidden}.map-street-row{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,0.85fr);gap:12px;align-items:start}.streetview-grid{display:grid;grid-template-columns:1fr;gap:12px}.streetview-card{border:1px solid #d5dbe3;border-radius:9px;overflow:hidden;background:#fff}.streetview-card h3{margin:0;padding:9px 12px;font-size:15px}.streetview-card img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#eef1f5}.streetview-card .sv-note{padding:7px 10px;font-size:11px;color:#666}.ev-warning{display:none;margin:0;padding:9px 10px;background:#fff1f1;border-top:2px solid #d00000;color:#c00000;font-weight:800;font-size:13px;line-height:1.35}.ev-warning.show{display:block}.ev-warning small{display:block;font-weight:600;color:#9f0000;margin-top:3px}.streetview-actions{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.streetview-actions>div{flex:1;min-width:280px}@media(max-width:760px){.map-street-row{grid-template-columns:1fr}}.leaflet-container img.leaflet-tile{max-width:none !important;max-height:none !important}.drop{border:2px dashed #9aa7b5;border-radius:8px;padding:18px;text-align:center;cursor:pointer}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:7px;border-bottom:1px solid #eee;text-align:left}
+canvas{width:100%;height:auto;display:block;border:0;border-radius:0;background:#fff}
+.badge{display:inline-block;background:#edf2f7;border-radius:20px;padding:3px 7px;margin:2px;font-size:11px}.google-layer-note{font-size:11px;color:#64748b;margin-top:6px}.leaflet-control-layers{font-size:12px}.leaflet-control-layers-base label{white-space:nowrap} .crossing-settings{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px;margin-top:8px}.crossing-settings .grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:7px;align-items:end}.crossing-settings label{font-size:11px;margin:0 0 3px}.crossing-settings input,.crossing-settings select{width:100%;padding:7px;border:1px solid #c7ced8;border-radius:6px;background:#fff}.small{font-size:11px;color:#64748b}@media(max-width:850px){.crossing-settings .grid{grid-template-columns:1fr 1fr}.crossing-settings .grid > div:first-child{grid-column:1/-1}}
+@media(max-width:850px){.layout{grid-template-columns:1fr}#map{height:500px}}
+<style>.leaflet-container.klic-crosshair{cursor:crosshair !important}.leaflet-container.klic-crosshair .leaflet-interactive{cursor:crosshair !important}
+.screen-hide{display:none !important;}
+</style>
+
+<style>
+.bore-point-marker{background:transparent!important;border:0!important;}
+.bore-point-marker span{display:block;width:28px;height:28px;line-height:28px;text-align:center;font:bold 28px/28px Arial,sans-serif;text-shadow:0 0 2px #fff,0 0 2px #fff;}
+.bore-point-start span{color:#e00000;}
+.bore-point-end span{color:#0057d9;}
+</style>
+</head>
+<body>
+<header>
+<h1>KLIC → Boorprofiel</h1>
+<p>KLIC uploaden → boorlijn bepalen → kruisingen bekijken → boorprofiel</p>
+</header>
+
+<div class="layout">
+<aside>
+<div class="card">
+<h2>1. KLIC-melding</h2>
+<div id="drop" class="drop">Sleep de KLIC ZIP hierheen<br>of klik om een bestand te kiezen</div>
+<input id="file" type="file" accept=".zip" hidden>
+<div id="klicStatus" class="status">Nog geen KLIC geladen.</div>
+</div>
+
+<div class="card">
+<h2>2. Boorlijn</h2>
+<p class="note">Klik eerst op het startpunt en daarna op het eindpunt. Opnieuw klikken begint een nieuwe boorlijn.</p>
+<div class="row">
+<div><label>Startdiepte A. Intrede (m onder maaiveld)</label><input id="startDepth" type="number" value="0.60" min="0" step="0.05"></div>
+<div><label>Einddiepte B. Uittrede (m onder maaiveld)</label><input id="endDepth" type="number" value="0.60" min="0" step="0.05"></div>
+</div>
+<div class="row" style="margin-top:8px">
+<div><label>Minimale dekking (m)</label><input id="cover" type="number" value="0.80" step="0.05"></div>
+<div><label>Lengte van de boring (m)</label><input id="length" readonly></div>
+</div>
+<div class="row" style="margin-top:10px">
+<div><label>Intredehoek A. Intrede</label><select id="entryAngle"><option value="5">5°</option><option value="8">8°</option><option value="10" selected>10°</option><option value="12">12°</option><option value="15">15°</option><option value="20">20°</option><option value="25">25°</option><option value="30">30°</option><option value="45">45°</option><option value="60">60°</option><option value="90">90°</option></select></div>
+<div><label>Uittredehoek B. Uittrede</label><select id="exitAngle"><option value="5">5°</option><option value="8">8°</option><option value="10" selected>10°</option><option value="12">12°</option><option value="15">15°</option><option value="20">20°</option><option value="25">25°</option><option value="30">30°</option><option value="45">45°</option><option value="60">60°</option><option value="90">90°</option></select></div>
+</div>
+<div class="row" style="margin-top:8px">
+<div class="screen-hide"><label>Berekende diepte van de boog</label><input id="arcDepth" readonly></div>
+<div class="screen-hide"><label>In-/uittredehoek in profiel</label><input id="angleSummary" readonly></div>
+</div>
+<p class="note screen-hide">De start- en einddiepte worden door jou opgegeven en worden exact als A. INTREDE en B. UITTREDE in het boorprofiel gebruikt. Het diepste punt wordt bepaald door de diepste KLIC-kruising plus de ingestelde veiligheidsafstand, zonder automatische extra verdieping.</p>
+<div style="margin-top:10px"><label>Maaiveldhoogte t.o.v. NAP</label><div class="row"><input id="maaiveldNap" type="number" step="0.01" placeholder="Automatisch ophalen"><button class="gray" id="fetchNapBtn" type="button" style="margin-top:0">NAP ophalen</button></div><p class="note screen-hide">De app kan de maaiveldhoogte automatisch ophalen uit het actuele AHN/PDOK-hoogtebestand. De waarde is een maaiveldhoogte t.o.v. NAP en wordt gebruikt voor de NAP-lijn van het boorprofiel.</p><div id="napStatus" class="status">NAP-hoogte nog niet opgehaald.</div></div>
+<div style="margin-top:10px"><label>Standaard afstand onder kabel/leiding (m)</label><input id="defaultClearance" type="number" value="1.00" min="0" step="0.05"><p class="note">Deze afstand wordt standaard gebruikt. Je kunt de afstand per kruising aanpassen.</p></div>
+
+<div class="card-inner" style="margin-top:12px;border-top:1px solid #e5e7eb;padding-top:12px">
+<h3 style="font-size:14px;margin:0 0 8px">Buis en boring</h3>
+<div class="row">
+  <div><label>Aantal buizen</label><select id="pipeCount"><option>1x</option><option>2x</option><option>3x</option><option>4x</option></select></div>
+  <div><label>Materiaal</label><select id="pipeMaterial"><option>PE100</option><option>PE100-RC</option><option>PE80</option><option>PVC</option><option>Anders</option></select></div>
+</div>
+<div class="row" style="margin-top:8px">
+  <div><label>Buisdiameter</label><select id="pipeDiameter"><option value="40">Ø40 mm</option><option value="50">Ø50 mm</option><option value="63">Ø63 mm</option><option value="75">Ø75 mm</option><option value="90">Ø90 mm</option><option value="110" selected>Ø110 mm</option><option value="125">Ø125 mm</option><option value="160">Ø160 mm</option><option value="200">Ø200 mm</option><option value="250">Ø250 mm</option><option value="315">Ø315 mm</option><option value="400">Ø400 mm</option><option value="custom">Eigen maat</option></select></div>
+  <div><label>Eigen buisdiameter (mm)</label><input id="pipeDiameterCustom" type="number" min="1" step="1" value="110" disabled></div>
+</div>
+<div class="row" style="margin-top:8px">
+  <div><label>Pilotboring Ø (mm)</label><input id="pilotDiameter" type="number" min="1" step="1" value="60"></div>
+  <div><label>Ruimen / boordiameter Ø (mm)</label><input id="reamDiameter" type="number" min="1" step="1" value="165"></div>
+</div>
+<p class="note">Deze gegevens worden ook op het boorprofiel en in de PDF vermeld. De ruimdiameter kun je zelf aanpassen.</p>
+</div>
+<button class="gray" id="clearBore">Wis boorlijn</button>
+</div>
+
+<div class="card">
+<h2>3. Kruisingen en afstand</h2>
+<p class="note">Per kruising kun je aangeven hoeveel meter je onder de kabel of leiding wilt blijven. De app gebruikt alleen een absolute boorhoogte als de KLIC daarvoor daadwerkelijk een bruikbare hoogte/diepte bevat.</p><div id="crossings" class="note">Kies een boorlijn en upload een KLIC-melding.</div>
+</div>
+</aside>
+
+<main>
+<div class="map-street-row">
+<div class="card">
+<div id="map"></div>
+</div>
+<div class="card streetview-only">
+  <input id="googleStreetViewKey" type="hidden">
+  <div id="streetviewStatus" style="display:none"></div>
+  <div class="streetview-grid">
+    <div class="streetview-card"><h3>A. Intrede</h3><img id="streetviewStart" alt="A. Intrede"><div id="evWarningStart" class="ev-warning"></div></div>
+    <div class="streetview-card"><h3>B. Uittrede</h3><img id="streetviewEnd" alt="B. Uittrede"><div id="evWarningEnd" class="ev-warning"></div></div>
+  </div>
+</div>
+</div>
+<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+<h2 style="margin:0">Boorprofiel</h2>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button id="previewPdfBtn" type="button">Voorbeeld PDF</button>
+<button id="choosePdfFolderBtn" type="button" class="gray">Kies PDF-map</button>
+<button id="exportPdfBtn" type="button">Exporteer boorprofiel naar PDF</button>
+<div id="pdfFolderStatus" class="note" style="width:100%;margin-top:4px">PDF wordt opgeslagen via de gekozen PDF-map als de app via HTTPS draait. Anders gebruikt de browser de normale download.</div>
+</div>
+</div>
+<p class="note">Alleen KLIC-kruisingen met de gekozen boorlijn worden in het profiel gezet. De rode boring volgt de ingestelde booghoek en blijft bij iedere kruising minimaal de gekozen vrije afstand onder de referentie. KLIC-diepte heeft voorrang. Als de Diepte onbekend is, wordt geen absolute leidingdiepte verzonnen: de nominale boog op die plek wordt alleen als ontwerp-/veiligheidsreferentie gebruikt en de boring gaat daar de gekozen afstand onderdoor.</p>
+<canvas id="profile" width="1500" height="520"></canvas>
+<div id="profileTable" style="margin-top:10px"></div>
+</div>
+
+<div class="card" id="pdfPreviewCard" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <h2 style="margin:0">PDF-voorbeeld</h2>
+    <button id="closePdfPreviewBtn" type="button" class="gray" style="width:auto;padding:8px 14px">Sluit voorbeeld</button>
+  </div>
+  <p class="note">Dit is het PDF-voorbeeld rechtstreeks in de pagina. De knop gebruikt geen browser-PDF-lezer en werkt daardoor ook wanneer het HTML-bestand lokaal vanaf je computer wordt geopend.</p>
+  <div style="overflow:auto;background:#dfe3e8;padding:14px;border-radius:8px">
+    <canvas id="pdfPreviewCanvas" width="1587" height="1123" style="display:block;width:100%;height:auto;background:#fff;border:1px solid #aeb5bd;border-radius:2px"></canvas>
+  </div>
+</div>
+</main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+ integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.gridlayer.googlemutant@0.16.0/dist/Leaflet.GoogleMutant.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/proj4@2.9.2/dist/proj4.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let map, addressMarker=null, startMarker=null, endMarker=null, boreLine=null;
+let boreStart=null, boreEnd=null, klicLayer=null, klicBackgroundLayer=null;
+let klicAreaLayer=null;
+let klicAreaLayers={informatie:null,graaf:null};
+let pdokBaseLayer=null;
+let klicBackgroundInfo=null;
+let klicObjects=[], crossings=[];
+let evNetworkIds=new Set();
+let evWarnings=[];
+let ahnProfile=[];
+let ahnTerrainLoaded=false;
+let ahnTerrainSource="";
+
+function pipeDiameterValue(){
+  const sel=$("pipeDiameter");
+  if(sel && sel.value==="custom") return Number($("pipeDiameterCustom").value)||0;
+  return Number(sel?.value)||0;
+}
+function pipeSpecification(){
+  const count=$("pipeCount")?.value||"1x";
+  const dia=pipeDiameterValue();
+  const mat=$("pipeMaterial")?.value||"PE100";
+  return `${count} Ø${dia||"?"} ${mat}`;
+}
+function boreSpecification(){
+  const pilot=Number($("pilotDiameter")?.value)||0;
+  const ream=Number($("reamDiameter")?.value)||0;
+  return `Pilotboring Ø${pilot||"?"} mm · Ruimen Ø${ream||"?"} mm`;
+}
+
+function initMap(){
+  if(typeof L === "undefined"){
+    if($("addressStatus")) $("addressStatus").innerHTML="<b>Kaartbibliotheek niet geladen.</b><br>Controleer je internetverbinding.";
+    return false;
+  }
+  map=L.map("map").setView([52.1,5.1],8);
+  const base=L.tileLayer("https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png",{
+    minZoom:6,
+    maxZoom:19,
+    attribution:"Kaartgegevens © Kadaster"
+  }).addTo(map);
+  pdokBaseLayer=base;
+  base.on("tileerror",()=>console.warn("PDOK kaarttegel kon niet worden geladen."));
+  klicBackgroundLayer=L.layerGroup().addTo(map);
+  klicLayer=L.layerGroup().addTo(map);
+  klicAreaLayer=L.layerGroup().addTo(map);
+
+  // Google Maps-basislagen worden naast de PDOK-kaart als keuzelagen aangeboden.
+  // De Google-laag wordt alleen geladen als er al een Google API-key voor Street View
+  // in localStorage aanwezig is. Zo hoeft de gebruiker geen extra sleutel in te voeren.
+  addGoogleBaseLayers(base);
+
+  setTimeout(()=>map.invalidateSize(),300);
+  return true;
+}
+
+let googleBaseLayersAdded=false;
+let googleApiPromise=null;
+
+function loadGoogleMapsApiForLayers(key){
+  if(window.google?.maps) return Promise.resolve();
+  if(googleApiPromise) return googleApiPromise;
+  if(!key) return Promise.reject(new Error("Geen Google API-key gevonden."));
+
+  googleApiPromise=new Promise((resolve,reject)=>{
+    const existing=document.querySelector('script[data-klic-google-maps="1"]');
+    if(existing){
+      const check=()=>window.google?.maps?resolve():setTimeout(check,50);
+      check();
+      return;
+    }
+    const script=document.createElement("script");
+    script.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(key)+"&v=weekly";
+    script.async=true;
+    script.defer=true;
+    script.dataset.klicGoogleMaps="1";
+    script.onload=()=>resolve();
+    script.onerror=()=>reject(new Error("Google Maps JavaScript API kon niet worden geladen."));
+    document.head.appendChild(script);
+  });
+  return googleApiPromise;
+}
+
+async function addGoogleBaseLayers(pdokBase){
+  if(googleBaseLayersAdded || !map) return;
+  const key=(localStorage.getItem("klic_google_streetview_key")||$("googleStreetViewKey")?.value||"").trim();
+  if(!key){
+    console.info("Google basislagen niet toegevoegd: geen Google API-key beschikbaar.");
+    return;
+  }
+  try{
+    await loadGoogleMapsApiForLayers(key);
+    if(typeof L?.gridLayer?.googleMutant!=="function") throw new Error("GoogleMutant-plugin niet geladen.");
+
+    const googleRoad=L.gridLayer.googleMutant({type:"roadmap",maxZoom:21});
+    const googleSatellite=L.gridLayer.googleMutant({type:"satellite",maxZoom:21});
+    const googleHybrid=L.gridLayer.googleMutant({type:"hybrid",maxZoom:21});
+    const googleTerrain=L.gridLayer.googleMutant({type:"terrain",maxZoom:21});
+
+    const baseLayers={
+      "PDOK achtergrondkaart":pdokBase,
+      "Google Wegen":googleRoad,
+      "Google Satelliet":googleSatellite,
+      "Google Hybride":googleHybrid,
+      "Google Terrein":googleTerrain
+    };
+    if(map._klicLayerControl){
+      map._klicLayerControl.addBaseLayer(pdokBase,"PDOK achtergrondkaart");
+      map._klicLayerControl.addBaseLayer(googleRoad,"Google Wegen");
+      map._klicLayerControl.addBaseLayer(googleSatellite,"Google Satelliet");
+      map._klicLayerControl.addBaseLayer(googleHybrid,"Google Hybride");
+      map._klicLayerControl.addBaseLayer(googleTerrain,"Google Terrein");
+    }else{
+      map._klicLayerControl=L.control.layers(baseLayers,null,{collapsed:true,position:"topleft",autoZIndex:true}).addTo(map);
+    }
+    googleBaseLayersAdded=true;
+  }catch(err){
+    console.warn("Google basislagen konden niet worden toegevoegd:",err);
+    const note=document.createElement("div");
+    note.className="google-layer-note";
+    note.textContent="Google kaartlagen niet beschikbaar: controleer Maps JavaScript API en API-key.";
+    const controls=document.querySelector("#map .leaflet-control-container .leaflet-top.leaflet-right");
+    if(controls) controls.appendChild(note);
+  }
+}
+
+function setKlicCrosshair(enabled){
+  if(!map) return;
+  const el=map.getContainer();
+  if(el) el.classList.toggle("klic-crosshair",!!enabled);
+}
+
+async function searchAddress(){
+  const pc=$("postcode").value.trim().toUpperCase().replace(/\s+/g,"");
+  const hnRaw=$("huisnummer").value.trim().replace(/\s+/g,"");
+
+  if(!/^[1-9][0-9]{3}[A-Z]{2}$/.test(pc)){
+    $("addressStatus").textContent="Gebruik bijvoorbeeld postcode 2726JW.";
+    return;
+  }
+  if(!/^\d+[A-Za-z]?$/.test(hnRaw)){
+    $("addressStatus").textContent="Vul een geldig huisnummer in.";
+    return;
+  }
+
+  const hn=(hnRaw.match(/^\d+/)||[""])[0];
+  const letter=(hnRaw.match(/[A-Za-z]$/)||[""])[0].toUpperCase();
+
+  $("searchBtn").disabled=true;
+  $("results").innerHTML="<div class='status'>Adres wordt opgezocht via PDOK...</div>";
+  $("addressStatus").textContent="Zoeken: "+pc+" "+hnRaw+"...";
+
+  // Nieuwe PDOK Location API. Deze API is juist bedoeld voor gebruik
+  // vanuit websites/apps en levert GeoJSON met de locatie direct mee.
+  const base="https://api.pdok.nl/kadaster/location-api/v1/search";
+  const params=new URLSearchParams();
+  params.set("q",pc+" "+hnRaw);
+  params.set("adres[version]","1");
+  params.set("limit","20");
+  params.set("f","geojson");
+
+  try{
+    const response=await fetch(base+"?"+params.toString());
+    if(!response.ok){
+      throw new Error("PDOK Location API HTTP "+response.status);
+    }
+
+    const data=await response.json();
+    const features=Array.isArray(data.features)?data.features:[];
+
+    // Alleen adressen met exact de gevraagde postcode en het gevraagde
+    // huisnummer accepteren. De Location API geeft de officiële BAG-
+    // adresnaam terug in properties.display_name.
+    const matches=features.filter(f=>{
+      const p=f.properties||{};
+      const naam=String(p.display_name||"");
+      const clean=naam.toUpperCase().replace(/\s+/g," ");
+      const pcOk=clean.includes(pc);
+      const nrRe=new RegExp("\\b"+hn+"(?:[A-Z])?(?:-[A-Z0-9]+)?\\s*,\\s*"+pc+"\\b","i");
+      const nrOk=nrRe.test(clean);
+      if(letter){
+        return pcOk && nrOk && new RegExp("\\b"+hn+letter+"\\s*,\\s*"+pc+"\\b","i").test(clean);
+      }
+      return pcOk && nrOk;
+    });
+
+    // Als de officiële weergavenaam anders is opgebouwd, gebruik dan het
+    // resultaat van de API wanneer er maar één treffer is.
+    const usable=matches.length?matches:(features.length===1?features:[]);
+
+    if(!usable.length){
+      $("results").innerHTML="<div class='status'><b>Adres niet gevonden</b><br>Geen adres gevonden voor "+esc(pc)+" "+esc(hnRaw)+".</div>";
+      $("addressStatus").textContent="Geen exact adres gevonden.";
+      return;
+    }
+
+    window.addressDocs=usable;
+    $("results").innerHTML=usable.map((f,i)=>{
+      const p=f.properties||{};
+      return `<div class="result" data-index="${i}">
+        <b>${esc(p.display_name||"Adres")}</b>
+      </div>`;
+    }).join("");
+
+    document.querySelectorAll("#results .result").forEach(el=>{
+      el.addEventListener("click",()=>chooseLocatieResult(usable[Number(el.dataset.index)]));
+    });
+
+    if(usable.length===1){
+      chooseLocatieResult(usable[0]);
+    }else{
+      $("addressStatus").textContent=usable.length+" resultaten gevonden. Kies het juiste adres.";
+    }
+  }catch(err){
+    console.error("PDOK Location API:",err);
+    $("results").innerHTML="<div class='status'><b>Fout bij adres zoeken</b><br>PDOK kon het adres niet ophalen.<br><small>Technische melding: "+esc(err.message)+"</small></div>";
+    $("addressStatus").textContent="De PDOK adresservice kon niet worden bereikt.";
+  }finally{
+    $("searchBtn").disabled=false;
+  }
+}
+
+function chooseLocatieResult(d){
+  const g=d.geometry||{};
+  if(g.type!=="Point"||!Array.isArray(g.coordinates)||g.coordinates.length<2){
+    $("addressStatus").textContent="Het gevonden adres heeft geen geldige kaartcoördinaat.";
+    return;
+  }
+
+  const lon=Number(g.coordinates[0]);
+  const lat=Number(g.coordinates[1]);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)){
+    $("addressStatus").textContent="Ongeldige kaartcoördinaten.";
+    return;
+  }
+
+  const p=d.properties||{};
+  const naam=p.display_name||"Adres";
+  const volledig=naam;
+
+  if(addressMarker)map.removeLayer(addressMarker);
+  addressMarker=L.marker([lat,lon]).addTo(map);
+  addressMarker.bindPopup("<b>"+esc(naam)+"</b>").openPopup();
+  map.setView([lat,lon],19.5);
+
+  $("addressStatus").innerHTML="<b>Gekozen adres:</b><br>"+esc(volledig);
+  $("results").innerHTML="";
+  setKlicCrosshair(true);
+}
+
+function chooseBagResult(feature){
+  const p=feature.properties||{};
+  const coords=feature.geometry&&feature.geometry.coordinates;
+  if(!Array.isArray(coords)||coords.length<2){
+    $("addressStatus").textContent="Het BAG-adres heeft geen kaartcoördinaat.";
+    return;
+  }
+
+  // OGC API CRS84 = [longitude, latitude].
+  const lon=Number(coords[0]),lat=Number(coords[1]);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)){
+    $("addressStatus").textContent="Ongeldige kaartcoördinaten.";
+    return;
+  }
+
+  const naam=[
+    p.openbare_ruimte_naam,
+    p.huisnummer,
+    p.huisletter,
+    p.toevoeging
+  ].filter(v=>v!==null&&v!==undefined&&String(v)!=="").join(" ");
+
+  const volledig=[naam,p.postcode,p.woonplaats_naam].filter(Boolean).join(", ");
+
+  if(addressMarker)map.removeLayer(addressMarker);
+  addressMarker=L.marker([lat,lon]).addTo(map);
+  addressMarker.bindPopup("<b>"+esc(naam)+"</b><br>"+esc(p.postcode||"")+" "+esc(p.woonplaats_naam||"")).openPopup();
+  map.setView([lat,lon],19.5);
+
+  $("addressStatus").innerHTML="<b>Gekozen adres:</b><br>"+esc(volledig);
+  $("results").innerHTML="";
+  setKlicCrosshair(true);
+}
+function chooseSearchResult(r){
+  const lat=Number(r.lat), lon=Number(r.lon);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)){
+    $("addressStatus").textContent="Het gevonden adres heeft geen geldige kaartlocatie.";
+    return;
+  }
+  if(addressMarker)map.removeLayer(addressMarker);
+  addressMarker=L.marker([lat,lon]).addTo(map);
+  addressMarker.bindPopup(esc(r.display_name)).openPopup();
+  map.setView([lat,lon],19.5);
+  $("addressStatus").innerHTML="<b>Gekozen adres:</b><br>"+esc(r.display_name);
+  $("results").innerHTML="";
+  setKlicCrosshair(true);
+}
+
+function initProjection(){
+  if(typeof proj4 === "undefined") return false;
+  if(!proj4.defs("EPSG:28992")){
+    proj4.defs("EPSG:28992", "+proj=sterea +lat_0=52.15616055555555 +lon_0=5.38763888888889 +k=0.9999079 +x_0=155000 +y_0=463000 +ellps=bessel +towgs84=565.4171,50.3319,465.5524,-0.398957,0.343988,-1.8774,4.0725 +units=m +no_defs");
+  }
+  return true;
+}
+
+function rdToWgs(x,y){
+  if(!initProjection()) throw new Error("RD-projectie is niet geladen.");
+  const p=proj4("EPSG:28992","EPSG:4326",[Number(x),Number(y)]);
+  return [p[1],p[0]];
+}
+
+function wgsToRd(lat,lon){
+  if(!initProjection()) throw new Error("RD-projectie is niet geladen.");
+  const p=proj4("EPSG:4326","EPSG:28992",[Number(lon),Number(lat)]);
+  return [p[0],p[1]];
+}
+
+function clearBore(){
+  [startMarker,endMarker,boreLine].forEach(x=>{if(x)map.removeLayer(x)});
+  startMarker=endMarker=boreLine=null;
+  boreStart=boreEnd=null;
+  ahnProfile=[]; ahnTerrainLoaded=false; ahnTerrainSource="";
+  if($("napStatus")) $("napStatus").textContent="NAP-hoogte nog niet opgehaald.";
+  $("length").value="";
+  crossings=[];
+  evWarnings=[];
+  [$("evWarningStart"),$("evWarningEnd")].forEach(el=>{if(el){el.classList.remove("show");el.innerHTML="";}});
+  renderCrossings();
+  drawProfile();
+  setKlicCrosshair(true);
+}
+
+function rdDistance(a,b){return Math.hypot(b[0]-a[0],b[1]-a[1]);}
+
+function segmentIntersection(a,b,c,d){
+  const den=(d[1]-c[1])*(b[0]-a[0])-(d[0]-c[0])*(b[1]-a[1]);
+  const eps=1e-9;
+  if(Math.abs(den)<eps){
+    // Parallel/collinear: check endpoints so a touch is still a crossing.
+    const on=(p,u,v)=>{
+      const cross=(p[0]-u[0])*(v[1]-u[1])-(p[1]-u[1])*(v[0]-u[0]);
+      if(Math.abs(cross)>0.02)return false; // ~2 cm in RD
+      return p[0]>=Math.min(u[0],v[0])-0.02&&p[0]<=Math.max(u[0],v[0])+0.02&&p[1]>=Math.min(u[1],v[1])-0.02&&p[1]<=Math.max(u[1],v[1])+0.02;
+    };
+    if(on(c,a,b)){ const t=rdDistance(a,b)?rdDistance(a,c)/rdDistance(a,b):0; return {t:Math.max(0,Math.min(1,t)),x:c[0],y:c[1]}; }
+    if(on(d,a,b)){ const t=rdDistance(a,b)?rdDistance(a,d)/rdDistance(a,b):0; return {t:Math.max(0,Math.min(1,t)),x:d[0],y:d[1]}; }
+    return null;
+  }
+  const ua=((d[0]-c[0])*(a[1]-c[1])-(d[1]-c[1])*(a[0]-c[0]))/den;
+  const ub=((b[0]-a[0])*(a[1]-c[1])-(b[1]-a[1])*(a[0]-c[0]))/den;
+  if(ua<-eps||ua>1+eps||ub<-eps||ub>1+eps)return null;
+  return {t:Math.max(0,Math.min(1,ua)),x:a[0]+ua*(b[0]-a[0]),y:a[1]+ua*(b[1]-a[1])};
+}
+
+function normalizeHref(href){
+  const s=String(href||"").trim();
+  if(!s)return "";
+  return s.split("#").pop().replace(/^\s+|\s+$/g,"");
+}
+
+function getHref(el, name){
+  if(!el)return "";
+  const a=[...el.getElementsByTagNameNS("*",name)][0];
+  return a?.getAttributeNS("http://www.w3.org/1999/xlink","href") || a?.getAttribute("href") || "";
+}
+
+function classify(text){
+  const s=String(text||"").toLowerCase();
+  // Volgorde is bewust: specifieke IMKL-termen eerst.
+  if(/datatransport|telecom|telecommunicatie|communication|glasvezel|fiber|coax/.test(s))return "Telecom";
+  if(/riool|riolering|sewer|afvalwater|vuilwater|hemelwater/.test(s))return "Riolering";
+  if(/gas|aardgas|stikstof|waterstof/.test(s))return "Gas";
+  if(/waterleiding|drinkwater|waternet|watertransport|water/.test(s))return "Water";
+  if(/warmte|stadsverwarming|warmtenet|stoom/.test(s))return "Warmte";
+  if(/elektr|laagspanning|middenspanning|hoogspanning|netspanning|voeding|energie/.test(s))return "Elektriciteit";
+  return "Overig";
+}
+
+function classifyNetwork(netInfo, fallbackText=""){
+  const s=(String(netInfo?.text||"")+" "+String(fallbackText||"")).toLowerCase();
+
+  if(/thema\/middenspanning|\bmiddenspanning\b|medium.?voltage/.test(s))return "Middenspanning";
+  if(/thema\/laagspanning|\blaagspanning\b|low.?voltage/.test(s))return "Laagspanning";
+  if(/thema\/hoogspanning|\bhoogspanning\b|high.?voltage/.test(s))return "Hoogspanning";
+  if(/thema\/gaslage.?druk|gaslage.?druk|lage.?druk.*gas/.test(s))return "Gas lage druk";
+  if(/thema\/gashoge.?druk|gashoge.?druk|hoge.?druk.*gas/.test(s))return "Gas hoge druk";
+  if(/thema\/datatransport|datatransport|telecom|telecommunicatie|communication|glasvezel|fiber|coax/.test(s))return "Telecom";
+  if(/thema\/water|waterleiding|drinkwater|waternet|watertransport/.test(s))return "Water";
+  if(/thema\/rioolvrijverval|rioolvrijverval|riool|riolering|sewer|afvalwater|vuilwater|hemelwater/.test(s))return "Riolering";
+  if(/thema\/rioolonderdruk|drukriol|pressure sewer/.test(s))return "Riolering druk";
+  if(/thema\/warmte|warmte|stadsverwarming|warmtenet|stoom/.test(s))return "Warmte";
+  if(/thema\/elektriciteit|elektr|netspanning|voeding|energie/.test(s))return "Elektriciteit";
+  if(/gas|aardgas|stikstof|waterstof/.test(s))return "Gas";
+  return "Overig";
+}
+
+function detectOwner(text){
+  const s=String(text||"").toLowerCase();
+  const owners=[
+    ["Enexis","enexis"],["Liander","liander"],["Stedin","stedin"],
+    ["Westland Infra","westland infra"],["Rendo","rendo"],["Coteq","coteq"],
+    ["Vitens","vitens"],["Evides","evides"],["Dunea","dunea"],
+    ["PWN","pwn"],["Brabant Water","brabant water"],["WML","wml"],
+    ["KPN","kpn"],["Odido","odido"],["ProRail","prorail"],
+    ["TenneT","tennet"],["Gasunie","gasunie"],["Staatsbosbeheer","staatsbosbeheer"]
+  ];
+  const hit=owners.find(x=>s.includes(x[1]));
+  return hit?hit[0]:"Onbekend";
+}
+
+function findDepth(feature, networkDepths, explicitDepths){
+  // 1) Zoek expliciete diepte t.o.v. maaiveld binnen het object.
+  const candidates=[];
+  for(const el of feature.getElementsByTagName("*")){
+    const n=(el.localName||el.nodeName||"").toLowerCase();
+    if(!/(diepte|depth|elevation|verticalposition|verticalepositie|zcoord|zwaarde)/.test(n)) continue;
+    if(el.getAttribute("nilReason") || el.getAttributeNS("http://www.w3.org/2001/XMLSchema-instance","nil")==="true") continue;
+    const raw=(el.textContent||"").trim().replace(",",".");
+    const m=raw.match(/-?\d+(?:\.\d+)?/);
+    if(m){
+      const val=Number(m[0]);
+      if(Number.isFinite(val) && Math.abs(val)<1000) candidates.push({name:n,value:Math.abs(val),source:"KLIC expliciete diepte"});
+    }
+  }
+  const preferred=candidates.find(x=>/(diepte|depth)/.test(x.name));
+  if(preferred) return preferred;
+
+  // 2) IMKL gebruikt ook een apart DiepteTovMaaiveld-object dat via inNetwork
+  //    aan een utiliteitsnet gekoppeld is.
+  const fid=feature.getAttribute("id")||feature.getAttributeNS("http://www.opengis.net/gml/3.2","id")||"";
+  if(explicitDepths && explicitDepths[fid]) return explicitDepths[fid];
+
+  // 3) Als er geen expliciete diepte is, gebruik de standaardDieptelegging
+  //    van het gekoppelde utiliteitsnet. Dit wordt duidelijk als STANDAARD
+  //    gemarkeerd; het is geen gemeten diepte.
+  const net=feature.getElementsByTagNameNS("*","inNetwork")[0]?.getAttributeNS("http://www.w3.org/1999/xlink","href") ||
+            feature.getElementsByTagNameNS("*","inNetwork")[0]?.getAttribute("href") || "";
+  if(net && networkDepths && Number.isFinite(networkDepths[net])){
+    return {name:"standaardDieptelegging",value:networkDepths[net],source:"KLIC standaard dieptelegging",standard:true};
+  }
+  return null;
+}
+
+function clearanceValue(o){
+  const v=Number(o.clearance);
+  return Number.isFinite(v)&&v>=0?v:Number($('defaultClearance').value)||1;
+}
+
+function fallbackDepth(type, owner){
+  const t=String(type||'').toLowerCase();
+  const o=String(owner||'').toLowerCase();
+  if(t.includes('telecom') || o==='kpn' || o==='odido') return {name:'Geschatte diepte',value:0.60,source:'Geschatte standaarddiepte (telecom/KPN)',standard:true,assumed:true};
+  if(t.includes('gas')) return {name:'Geschatte diepte',value:1.00,source:'Geschatte standaarddiepte (gas)',standard:true,assumed:true};
+  if(t.includes('water')) return {name:'Geschatte diepte',value:1.20,source:'Geschatte standaarddiepte (water)',standard:true,assumed:true};
+  return null;
+}
+
+
+function parseKlicAreaPolygons(doc){
+  const gml="http://www.opengis.net/gml/3.2";
+  const result={informatie:[],graaf:[]};
+  const members=[...doc.getElementsByTagNameNS(gml,"featureMember")];
+  for(const fm of members){
+    const feature=fm.firstElementChild;
+    if(!feature) continue;
+    const lname=(feature.localName||"").toLowerCase();
+    const kind=lname==="informatiepolygoon"?"informatie":lname==="graafpolygoon"?"graaf":null;
+    if(!kind) continue;
+    for(const poly of [...feature.getElementsByTagNameNS(gml,"Polygon")]){
+      const rings=[];
+      const ext=poly.getElementsByTagNameNS(gml,"exterior")[0];
+      const pos=ext?.getElementsByTagNameNS(gml,"posList")[0];
+      if(!pos) continue;
+      const vals=pos.textContent.trim().split(/\s+/).map(Number).filter(Number.isFinite);
+      const outer=[];
+      for(let i=0;i+1<vals.length;i+=2) outer.push([vals[i],vals[i+1]]);
+      if(outer.length>=3) rings.push(outer);
+      for(const interior of [...poly.getElementsByTagNameNS(gml,"interior")]){
+        const p=interior.getElementsByTagNameNS(gml,"posList")[0];
+        if(!p) continue;
+        const v=p.textContent.trim().split(/\s+/).map(Number).filter(Number.isFinite);
+        const ring=[];
+        for(let i=0;i+1<v.length;i+=2) ring.push([v[i],v[i+1]]);
+        if(ring.length>=3) rings.push(ring);
+      }
+      if(rings.length) result[kind].push({id:feature.getAttribute("id")||"",rings});
+    }
+  }
+  return result;
+}
+
+function renderKlicAreaPolygons(doc){
+  if(!map || !klicAreaLayer) return;
+  klicAreaLayer.clearLayers();
+  klicAreaLayers={informatie:null,graaf:null};
+  const areas=parseKlicAreaPolygons(doc);
+
+  function makeGroup(items,style,label){
+    const group=L.layerGroup();
+    for(const item of items){
+      const rings=item.rings.map(r=>r.map(([x,y])=>{
+        const ll=rdToWgs(x,y);
+        return [ll[0],ll[1]];
+      }));
+      L.polygon(rings,style).bindTooltip(label,{sticky:true}).addTo(group);
+    }
+    return group;
+  }
+
+  if(areas.informatie.length){
+    klicAreaLayers.informatie=makeGroup(areas.informatie,
+      {color:"#2563eb",weight:2,opacity:.95,fillColor:"#60a5fa",fillOpacity:.08,dashArray:"8 6"},
+      "KLIC informatiegebied");
+    klicAreaLayers.informatie.addTo(klicAreaLayer);
+  }
+  if(areas.graaf.length){
+    klicAreaLayers.graaf=makeGroup(areas.graaf,
+      {color:"#f59e0b",weight:3,opacity:.95,fillColor:"#fbbf24",fillOpacity:.10,dashArray:"4 5"},
+      "KLIC graafgebied");
+    klicAreaLayers.graaf.addTo(klicAreaLayer);
+  }
+
+  if(!map._klicAreaControl && (areas.informatie.length||areas.graaf.length)){
+    const overlays={};
+    if(klicAreaLayers.informatie) overlays["KLIC informatiegebied"]=klicAreaLayers.informatie;
+    if(klicAreaLayers.graaf) overlays["KLIC graafgebied"]=klicAreaLayers.graaf;
+    // De KLIC-gebieden worden als overlays toegevoegd aan dezelfde lagenbediening.
+    // De gebruiker opent alles via één compact lagen-icoon rechtsboven.
+    const layerControl=map._klicLayerControl || null;
+    if(layerControl){
+      Object.entries(overlays).forEach(([name,layer])=>layerControl.addOverlay(layer,name));
+    }else{
+      map._klicLayerControl=L.control.layers(null,overlays,{collapsed:true,position:"topleft",autoZIndex:true}).addTo(map);
+      map._klicAreaControl=map._klicLayerControl;
+    }
+    map._klicAreaControl=true;
+  }
+
+  // Zoom op het echte KLIC-gebied, niet op een zelf berekende rechthoek.
+  const bounds=[];
+  for(const kind of ["informatie","graaf"]){
+    for(const item of areas[kind]) for(const ring of item.rings) for(const [x,y] of ring){
+      const ll=rdToWgs(x,y); bounds.push([ll[0],ll[1]]);
+    }
+  }
+  if(bounds.length && !boreStart && !boreEnd) map.fitBounds(L.latLngBounds(bounds),{padding:[25,25]});
+}
+
+function parseKlic(xmlText){
+  const doc=new DOMParser().parseFromString(xmlText,"application/xml");
+  if(doc.querySelector("parsererror"))throw new Error("XML kon niet worden gelezen.");
+  klicObjects=[];
+  evNetworkIds=new Set();
+  evWarnings=[];
+  renderKlicAreaPolygons(doc);
+
+  const gml="http://www.opengis.net/gml/3.2";
+  const xlink="http://www.w3.org/1999/xlink";
+  const xsi="http://www.w3.org/2001/XMLSchema-instance";
+  const members=[...doc.getElementsByTagNameNS(gml,"featureMember")];
+
+  // Eerst alle utiliteitsnetten lezen. In IMKL erven kabels en leidingen
+  // hun thema via net:inNetwork; alleen zoeken in de tekst van de lijn zelf
+  // is daarom niet betrouwbaar. Zie PMKL: de kleur/thematiek komt van UtilityNet.
+  // In IMKL staat de organisatie niet rechtstreeks op de geometrie.
+  // De koppeling is: kabel/leiding -> Utiliteitsnet -> Belanghebbende
+  // -> netbeheerder -> Beheerder.
+  const beheerderNaam={};
+  for(const f of members){
+    const feature=f.firstElementChild;
+    if(!feature)continue;
+    if((feature.localName||"").toLowerCase()!=="beheerder")continue;
+    const id=normalizeHref(feature.getAttribute("id")||feature.getAttributeNS(gml,"id")||"");
+    if(!id)continue;
+    const org=[...feature.getElementsByTagNameNS("*","organisatie")][0]?.textContent?.trim()||"";
+    beheerderNaam[id]=org;
+  }
+
+  const networkOwner={};
+  for(const f of members){
+    const feature=f.firstElementChild;
+    if(!feature)continue;
+    if((feature.localName||"").toLowerCase()!=="belanghebbende")continue;
+    const ownerRef=[...feature.getElementsByTagNameNS("*","netbeheerder")][0];
+    const ownerId=normalizeHref(ownerRef?.getAttributeNS(xlink,"href")||ownerRef?.getAttribute("href")||"");
+    const owner=beheerderNaam[ownerId]||"";
+    if(!owner)continue;
+    for(const n of feature.getElementsByTagNameNS("*","utiliteitsnet")){
+      const netId=normalizeHref(n.getAttributeNS(xlink,"href")||n.getAttribute("href")||"");
+      if(netId)networkOwner[netId]=owner;
+    }
+  }
+
+  // Eis Voorzorgsmaatregel (EV): op utiliteitsnetniveau wordt dit in IMKL
+  // via Belanghebbende.indicatieEisVoorzorgsmaatregel aangegeven. Daarnaast
+  // kunnen individuele netelementen een AanduidingEisVoorzorgsmaatregel hebben.
+  // We bewaren de netwerk-ID's zodat de waarschuwing alleen verschijnt bij een
+  // EV-netwerk dat daadwerkelijk de gekozen boorlijn kruist.
+  for(const f of members){
+    const feature=f.firstElementChild;
+    if(!feature)continue;
+    const lname=(feature.localName||"").toLowerCase();
+    if(lname==="belanghebbende"){
+      const ind=[...feature.getElementsByTagNameNS("*","indicatieEisVoorzorgsmaatregel")][0];
+      const isTrue=String(ind?.textContent||"").trim().toLowerCase()==="true";
+      if(isTrue){
+        const netEl=[...feature.getElementsByTagNameNS("*","utiliteitsnet")][0];
+        const netId=normalizeHref(netEl?.getAttributeNS(xlink,"href")||netEl?.getAttribute("href")||"");
+        if(netId)evNetworkIds.add(netId);
+      }
+    }
+    if(lname.includes("aanduidingeisvoorzorgsmaatregel")){
+      const netEls=[...feature.getElementsByTagNameNS("*","inNetwork"),...feature.getElementsByTagNameNS("*","utiliteitsnet")];
+      for(const n of netEls){
+        const netId=normalizeHref(n.getAttributeNS(xlink,"href")||n.getAttribute("href")||"");
+        if(netId)evNetworkIds.add(netId);
+      }
+    }
+  }
+
+  // Status per UtilityLink. IMKL currentStatus is defined on the UtilityLinkSet/links.
+  // We keep the status so the KLIC line can use the PMKL line pattern.
+  const utilityLinkStatus={};
+  for(const f of members){
+    const feature=f.firstElementChild;
+    if(!feature)continue;
+    if((feature.localName||"").toLowerCase()!=="utilitylink")continue;
+    const id=normalizeHref(feature.getAttribute("id")||feature.getAttributeNS(gml,"id")||"");
+    if(!id)continue;
+    const st=[...feature.getElementsByTagNameNS("*","currentStatus")][0];
+    const href=st?.getAttributeNS(xlink,"href")||st?.getAttribute("href")||st?.textContent||"";
+    utilityLinkStatus[id]=String(href).split("/").pop().trim().toLowerCase()||"functional";
+  }
+
+  const networks={};
+  for(const f of members){
+    const feature=f.firstElementChild;
+    if(!feature)continue;
+    if((feature.localName||"").toLowerCase()!=="utiliteitsnet")continue;
+    const id=feature.getAttribute("id")||feature.getAttributeNS(gml,"id")||"";
+    const key=normalizeHref(id);
+    if(!key)continue;
+    const text=feature.textContent.replace(/\s+/g," ").trim();
+    const sd=[...feature.getElementsByTagNameNS("*","standaardDieptelegging")][0];
+    let standardDepth=null;
+    if(sd){
+      const v=Number(String(sd.textContent||"").trim().replace(",","."));
+      if(Number.isFinite(v))standardDepth=Math.abs(v);
+    }
+    const typeRefs=[...feature.getElementsByTagNameNS("*","thema"),
+                    ...feature.getElementsByTagNameNS("*","subThema"),
+                    ...feature.getElementsByTagNameNS("*","netType"),
+                    ...feature.getElementsByTagNameNS("*","typeNet")]
+      .map(e=>e.getAttributeNS(xlink,"href")||e.getAttribute("href")||e.textContent||"").join(" ");
+    networks[key]={id:key,text:text+" "+typeRefs,standardDepth,owner:networkOwner[key]||"Onbekend"};
+  }
+
+  const networkDepths={};
+  Object.keys(networks).forEach(k=>{
+    if(Number.isFinite(networks[k].standardDepth))networkDepths[k]=networks[k].standardDepth;
+  });
+
+  // Expliciete dieptes. Deze kunnen als losse feature aan een netwerk hangen.
+  const explicitDepths={};
+  for(const f of members){
+    const feature=f.firstElementChild;if(!feature)continue;
+    if((feature.localName||"").toLowerCase()!=="dieptetovmaaiveld")continue;
+    const peil=[...feature.getElementsByTagNameNS("*","dieptePeil")][0];
+    const netEl=[...feature.getElementsByTagNameNS("*","inNetwork")][0];
+    const net=normalizeHref(netEl?.getAttributeNS(xlink,"href")||netEl?.getAttribute("href")||"");
+    if(!peil || peil.getAttribute("nilReason") || peil.getAttributeNS(xsi,"nil")==="true" || !net)continue;
+    const v=Number(String(peil.textContent||"").trim().replace(",","."));
+    if(!Number.isFinite(v))continue;
+    let point=null;
+    const pos=feature.getElementsByTagNameNS(gml,"pos")[0];
+    if(pos){const a=pos.textContent.trim().split(/\s+/).map(Number);if(a.length>=2)point=[a[0],a[1]];}
+    explicitDepths[net]=explicitDepths[net]||[];
+    explicitDepths[net].push({value:Math.abs(v),source:"KLIC expliciete diepte",standard:false,point});
+  }
+
+  for(const member of members){
+    const feature=member.firstElementChild;if(!feature)continue;
+    const lname=(feature.localName||"").toLowerCase();
+    if(lname==="utiliteitsnet"||lname==="dieptetovmaaiveld")continue;
+
+    const netEl=[...feature.getElementsByTagNameNS("*","inNetwork")][0];
+    const net=normalizeHref(netEl?.getAttributeNS(xlink,"href")||netEl?.getAttribute("href")||"");
+
+    // Alleen objecten met een netwerkrelatie zijn relevant als KLIC-kabel/leiding.
+    // Dit voorkomt dat annotaties, labels en andere geometrieën als leiding worden gezien.
+    if(!net)continue;
+
+    let geom=[];
+    for(const el of [...feature.getElementsByTagNameNS(gml,"posList")]){
+      const v=el.textContent.trim().split(/\s+/).map(Number).filter(Number.isFinite);
+      const dim=Math.max(2,Number(el.getAttribute("srsDimension"))||Number(feature.getAttribute("srsDimension"))||2);
+      for(let i=0;i+1<v.length;i+=dim)geom.push([v[i],v[i+1],dim>=3?v[i+2]:null]);
+    }
+    if(!geom.length){
+      for(const el of [...feature.getElementsByTagNameNS(gml,"pos")]){
+        const v=el.textContent.trim().split(/\s+/).map(Number).filter(Number.isFinite);
+        if(v.length>=2)geom.push([v[0],v[1],v.length>=3?v[2]:null]);
+      }
+    }
+    if(!geom.length){
+      for(const el of [...feature.getElementsByTagNameNS(gml,"coordinates")]){
+        for(const pair of el.textContent.trim().split(/\s+/)){
+          const a=pair.split(",").map(Number);
+          if(a.length>=2&&Number.isFinite(a[0])&&Number.isFinite(a[1]))geom.push([a[0],a[1],a[2]??null]);
+        }
+      }
+    }
+    if(geom.length<2)continue;
+
+    const id=feature.getAttribute("id")||feature.getAttributeNS(gml,"id")||"";
+    const text=feature.textContent.replace(/\s+/g," ").trim();
+    const netInfo=networks[net]||{id:net,text:"",standardDepth:null};
+    const combined=id+" "+text+" "+netInfo.text;
+    const objType=classifyNetwork(netInfo,combined);
+    const objOwner=(netInfo.owner&&netInfo.owner!=="Onbekend")?netInfo.owner:detectOwner(combined);
+
+    let depth=findDepth(feature,networkDepths,{});
+    if(!depth && explicitDepths[net]?.length){
+      let best=null,bestD=Infinity;
+      for(const p of explicitDepths[net]){
+        if(!p.point)continue;
+        for(const q of geom){
+          const d=Math.hypot(q[0]-p.point[0],q[1]-p.point[1]);
+          if(d<bestD){bestD=d;best=p;}
+        }
+      }
+      if(best && bestD<5)depth={...best,source:"KLIC expliciete diepte (nabij object)"};
+    }
+    if(!depth && Number.isFinite(netInfo.standardDepth)){
+      depth={name:"standaardDieptelegging",value:netInfo.standardDepth,source:"KLIC standaard dieptelegging",standard:true};
+    }
+    if(!depth)depth=fallbackDepth(objType,objOwner);
+
+    // Status: first try the object itself, otherwise resolve net:link -> UtilityLink.
+    let status="functional";
+    const ownStatus=[...feature.getElementsByTagNameNS("*","currentStatus")][0];
+    if(ownStatus){
+      const href=ownStatus.getAttributeNS(xlink,"href")||ownStatus.getAttribute("href")||ownStatus.textContent||"";
+      status=String(href).split("/").pop().trim().toLowerCase()||"functional";
+    }else{
+      const linkRefs=[...feature.getElementsByTagNameNS("*","link")];
+      const statuses=linkRefs.map(el=>{
+        const ref=normalizeHref(el.getAttributeNS(xlink,"href")||el.getAttribute("href")||"");
+        return utilityLinkStatus[ref]||"";
+      }).filter(Boolean);
+      if(statuses.includes("disused")) status="disused";
+      else if(statuses.includes("projected")) status="projected";
+      else if(statuses.length) status=statuses[0];
+    }
+
+    klicObjects.push({id,geom,type:objType,owner:objOwner,ev:evNetworkIds.has(net),label:[...feature.getElementsByTagNameNS("*","label")][0]?.textContent?.trim()||"",depth,network:net,networkText:netInfo.text,status,raw:text.slice(0,500),clearance:Number($("defaultClearance").value)||1});
+  }
+
+  if(!klicObjects.length)throw new Error("Geen KLIC-kabels of leidingen met geometrie gevonden in de KLIC-XML.");
+}
+
+function klicKleur(o){
+  // PMKL/IMKL themakleuren. Omdat het thema in UtilityNet staat, gebruiken
+  // we netwerktekst i.p.v. alleen de naam van de geometrie.
+  const s=(String(o.networkText||"")+" "+String(o.type||"")).toLowerCase();
+  if(/laagspann|low.?voltage|\bls\b/.test(s))return "#960000";
+  if(/middenspann|medium.?voltage|\bms\b/.test(s))return "#c80000";
+  if(/hoogspann|high.?voltage|\bhs\b|national high/.test(s))return "#ff0000";
+  if(/gevaarlijke inhoud|dangerous contents|gevaarlijke stof/.test(s))return "#ff7f00";
+  if(/petrochem/.test(s))return "#b64a00";
+  if(/gas.*hoog|high.?pressure|hoge.?druk/.test(s))return "#ffaf3c";
+  if(/gas/.test(s))return "#ffd750";
+  if(/riool.*druk|drukriol|pressure sewer/.test(s))return "#800080";
+  if(/riool|riolering|sewer/.test(s))return "#ba38a8";
+  if(/warmte|stadsverwarming|warmtenet|stoom/.test(s))return "#008080";
+  if(/waterleiding|drinkwater|waternet|water/.test(s))return "#0000ff";
+  if(/datatransport|telecom|telecommunicatie|communication|glasvezel|fiber|coax/.test(s))return "#00ff00";
+  if(/wees|orphan|onbekend/.test(s))return "#918a6f";
+  return "#6f5c10";
+}
+
+function clearKlicBackground(){
+  if(klicBackgroundLayer) klicBackgroundLayer.clearLayers();
+  klicBackgroundInfo=null;
+}
+
+async function loadKlicBackground(zip, xmlText){
+  clearKlicBackground();
+  if(!map) return;
+  const doc=new DOMParser().parseFromString(xmlText,"application/xml");
+  const refEl=[...doc.getElementsByTagNameNS("*","kaartreferentie")][0];
+  const ref=(refEl?.textContent||"").trim();
+  if(!ref) return;
+  const names=Object.keys(zip.files);
+  const norm=s=>String(s||"").replace(/\\/g,"/").replace(/^\.\//,"").toLowerCase();
+  const wanted=norm(ref);
+  const imageName=names.find(n=>norm(n).endsWith(wanted)) || names.find(n=>norm(n).split("/").pop()===wanted.split("/").pop());
+  if(!imageName || !/\.png$/i.test(imageName)) return;
+  const lower=[...doc.getElementsByTagNameNS("*","lowerCorner")][0]?.textContent.trim().split(/\s+/).map(Number)||[];
+  const upper=[...doc.getElementsByTagNameNS("*","upperCorner")][0]?.textContent.trim().split(/\s+/).map(Number)||[];
+  if(lower.length<2 || upper.length<2 || !lower.every(Number.isFinite) || !upper.every(Number.isFinite)) return;
+  const blob=await zip.file(imageName).async("blob");
+  const url=URL.createObjectURL(blob);
+  const sw=rdToWgs(lower[0],lower[1]);
+  const ne=rdToWgs(upper[0],upper[1]);
+  const bounds=L.latLngBounds([sw[0],sw[1]],[ne[0],ne[1]]);
+  L.imageOverlay(url,bounds,{opacity:1,interactive:false,zIndex:200}).addTo(klicBackgroundLayer);
+  klicBackgroundInfo={url,ref:imageName,bounds,rdBounds:{minX:lower[0],minY:lower[1],maxX:upper[0],maxY:upper[1]}};
+  map.fitBounds(bounds,{padding:[10,10]});
+  setTimeout(()=>map.invalidateSize(),100);
+}
+
+function renderKlic(){
+  klicLayer.clearLayers();
+
+  for(const o of klicObjects){
+    if(o.geom.length<2)continue;
+    const latlngs=o.geom.map(p=>rdToWgs(p[0],p[1]));
+    const kleur=klicKleur(o);
+
+    const status=String(o.status||"functional").toLowerCase();
+    // PMKL: functional = continuous; projected = 4,16; disused = 40,12,8,12.
+    const dash=status==="disused" ? "40 12 8 12" : (status==="projected" ? "4 16" : null);
+    L.polyline(latlngs,{
+      color:kleur,
+      weight:3,
+      opacity:.85,
+      dashArray:dash
+    })
+      .bindPopup("<b>"+esc(o.type)+"</b><br>"+esc(o.label||o.id))
+      .addTo(klicLayer);
+  }
+
+  const bounds=[];
+  klicObjects.forEach(o=>o.geom.forEach(p=>bounds.push(rdToWgs(p[0],p[1]))));
+  if(bounds.length&&!boreStart)map.fitBounds(L.latLngBounds(bounds),{padding:[20,20]});
+}
+
+function analyze(){
+  if(!boreStart||!boreEnd)return;
+  crossings=[];
+
+  for(const o of klicObjects){
+    let best=null;
+    for(let i=1;i<o.geom.length;i++){
+      const hit=segmentIntersection(boreStart,boreEnd,o.geom[i-1],o.geom[i]);
+      if(hit && (!best || hit.t<best.t)) best=hit;
+    }
+    if(best){
+      crossings.push({...o,t:best.t,rd:[best.x,best.y],clearance:Number($("defaultClearance").value)||1});
+    }
+  }
+
+  crossings.sort((a,b)=>a.t-b.t);
+  renderCrossings();
+  drawProfile();
+}
+
+function renderCrossings(){
+  if(!crossings.length){
+    $("crossings").innerHTML="Geen KLIC-kruisingen gevonden op de huidige boorlijn.";
+    return;
+  }
+
+  const len=rdDistance(boreStart,boreEnd);
+  let html="";
+  crossings.forEach((o,i)=>{
+    const afstand=(o.t*len).toFixed(1);
+    const depthText=o.depth ? `${o.depth.value.toFixed(2)} m (${esc(o.depth.source||o.depth.name||"KLIC")})` : "Niet beschikbaar in KLIC";
+    const target=o.depth ? (o.depth.value+clearanceValue(o)).toFixed(2)+" m" : "Niet berekenbaar";
+    html += `<div class="crossing-settings">
+      <div><b>${i+1}. ${esc(o.owner)} – ${esc(o.type)}</b></div>
+      <div class="small">Kruising op ${afstand} m vanaf startpunt${o.label?" · "+esc(o.label):""}</div>
+      <div class="grid" style="margin-top:7px">
+        <div><label>Afstand eronder</label><input data-cross="${i}" class="clearance-input" type="number" min="0" step="0.05" value="${clearanceValue(o).toFixed(2)}"></div>
+        <div><label>Diepte volgens KLIC</label><div class="small" style="padding:8px 0">${depthText}</div></div>
+        <div><label>Berekende boordiepte</label><div class="small" style="padding:8px 0"><b>${target}</b></div></div>
+      </div>
+    </div>`;
+  });
+  $("crossings").innerHTML=html;
+  document.querySelectorAll('.clearance-input').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      const i=Number(inp.dataset.cross);
+      crossings[i].clearance=Number(inp.value)||0;
+      crossings[i]._customClearance=true;
+      renderCrossings();
+      drawProfile();
+    });
+  });
+}
+
+function renderCrossings(){
+  if(!crossings.length){
+    $("crossings").innerHTML="<div class='note'>Geen kruisingen gevonden.</div>";
+    return;
+  }
+  const len=rdDistance(boreStart,boreEnd);
+  let html="";
+  crossings.forEach((o,i)=>{
+    const afstand=(o.t*len).toFixed(1);
+    const depthText=o.depth ? `${o.depth.value.toFixed(2)} m (${esc(o.depth.source||o.depth.name||"KLIC")})` : "Niet beschikbaar in KLIC";
+    const target=o.depth ? (o.depth.value+clearanceValue(o)).toFixed(2)+" m" : "Niet berekenbaar";
+    html += `<div class="crossing-settings">
+      <div><b>${i+1}. ${esc(o.owner)} – ${esc(o.type)}</b></div>
+      <div class="small">Kruising op ${afstand} m vanaf startpunt${o.label?" · "+esc(o.label):""}</div>
+      <div class="grid" style="margin-top:7px">
+        <div><label>Afstand eronder</label><input data-cross="${i}" class="clearance-input" type="number" min="0" step="0.05" value="${clearanceValue(o).toFixed(2)}"></div>
+        <div><label>Diepte volgens KLIC</label><div class="small" style="padding:8px 0">${depthText}</div></div>
+        <div><label>Berekende boordiepte</label><div class="small" style="padding:8px 0"><b>${target}</b></div></div>
+      </div>
+    </div>`;
+  });
+  $("crossings").innerHTML=html;
+  document.querySelectorAll('.clearance-input').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      const i=Number(inp.dataset.cross);
+      crossings[i].clearance=Number(inp.value)||0;
+      crossings[i]._customClearance=true;
+      renderCrossings();
+      drawProfile();
+    });
+  });
+}
+
+function arcGeometry(){
+  if(!boreStart||!boreEnd)return null;
+  const chord=rdDistance(boreStart,boreEnd);
+  const deg=Math.max(0.1,Math.min(89.9,Number($("arcAngle")?.value)||10));
+  const a=deg*Math.PI/180;
+  // De hoek is de gewenste start boring-/einde boringhoek t.o.v. maaiveld.
+  // Voor een symmetrische cirkelboog is de centrale hoek 2*a.
+  const R=chord/(2*Math.sin(a));
+  const sag=R*(1-Math.cos(a));
+  if($("arcDepth")) $("arcDepth").value=Number.isFinite(sag)?sag.toFixed(2):"";
+  return {chord,deg,a,R,sag};
+}
+
+function nominalArcDepth(t){
+  const g=arcGeometry();
+  if(!g)return 0;
+  // Exacte symmetrische cirkelboog met 0 m diepte op beide eindpunten.
+  const x=(t-0.5)*g.chord;
+  const under=Math.max(0,g.R*g.R-x*x);
+  return Math.max(0,g.R-Math.sqrt(under));
+}
+
+// Maak een vloeiende curve door de noodzakelijke dieptes op de KLIC-kruisingen.
+// De curve begint op maaiveld met de gekozen hoek en eindigt op maaiveld met
+// dezelfde hoek omhoog. Tussen de kruisingen gebruiken we monotone Hermite-
+// segmenten, zodat de boring niet ongewenst weer omhoog gaat vóór een volgende
+// diepere leiding.
+function buildBoreCurve(points, entryAngleDeg, exitAngleDeg){
+  if(points.length<2)return points;
+  const n=points.length;
+  const xs=points.map(p=>p.t);
+  const ys=points.map(p=>Math.max(0,p.d));
+  const ms=new Array(n).fill(0);
+  const tanIn=Math.tan(Math.max(0.1,Math.min(89.9,entryAngleDeg))*Math.PI/180);
+  const tanOut=Math.tan(Math.max(0.1,Math.min(89.9,exitAngleDeg))*Math.PI/180);
+  const len=Math.max(0.001,rdDistance(boreStart,boreEnd));
+  const h=new Array(n-1), delta=new Array(n-1);
+  for(let i=0;i<n-1;i++){
+    h[i]=Math.max(1e-6,(xs[i+1]-xs[i])*len);
+    delta[i]=(ys[i+1]-ys[i])/h[i];
+  }
+
+  // De boorcurve mag tussen twee opeenvolgende KLIC-eisen nooit de verkeerde
+  // kant op bewegen. Is de volgende eis dieper, dan blijft de curve dalen;
+  // is hij ondieper, dan mag hij gecontroleerd stijgen. Zo ontstaat geen
+  // ongewenste op-en-neer beweging tussen bijvoorbeeld KPN en water.
+  ms[0]=Math.min(tanIn, Math.max(0, 3*Math.abs(delta[0])));
+  ms[n-1]=-Math.min(tanOut, Math.max(0, 3*Math.abs(delta[n-2])));
+
+  // Fritsch-Carlson monotone hellingen. Dit voorkomt overshoot en lokale
+  // minima/maxima tussen de ankerpunten, terwijl de curve wel vloeiend blijft.
+  for(let i=1;i<n-1;i++){
+    const d0=delta[i-1], d1=delta[i];
+    if(d0===0 || d1===0 || d0*d1<=0){
+      ms[i]=0;
+      continue;
+    }
+    const w1=2*h[i]+h[i-1];
+    const w2=h[i]+2*h[i-1];
+    ms[i]=(w1+w2)/(w1/d0+w2/d1);
+  }
+
+  // Eindhellingen moeten de gekozen in-/einde boringhoek volgen, maar mogen een
+  // eerste/laatste segment niet laten overschieten.
+  if(delta[0]!==0){
+    const lim=3*Math.abs(delta[0]);
+    ms[0]=Math.sign(delta[0])*Math.min(tanIn,lim);
+  } else ms[0]=0;
+  if(delta[n-2]!==0){
+    const lim=3*Math.abs(delta[n-2]);
+    // Naar maaiveld toe is de helling negatief in diepte-coordinaten.
+    ms[n-1]=Math.sign(delta[n-2])*(-Math.min(tanOut,lim));
+  } else ms[n-1]=0;
+
+  // Hermite-segmenten met monotone begrenzing. Als een segment ondanks
+  // afronding toch een verkeerde richting krijgt, zetten we de hellingen
+  // lokaal terug naar nul; de curve blijft dan vloeiend en veilig.
+  for(let i=0;i<n-1;i++){
+    const d=delta[i];
+    if(Math.abs(d)<1e-12){ ms[i]=0; ms[i+1]=0; continue; }
+    if(ms[i]*d<0)ms[i]=0;
+    if(ms[i+1]*d<0)ms[i+1]=0;
+    const a=ms[i]/d, b=ms[i+1]/d;
+    if(a<0 || b<0){ ms[i]=0; ms[i+1]=0; continue; }
+    const sum=a*a+b*b;
+    if(sum>9){
+      const tau=3/Math.sqrt(sum);
+      ms[i]=tau*a*d;
+      ms[i+1]=tau*b*d;
+    }
+  }
+
+  const out=[];
+  const N=480;
+  for(let k=0;k<=N;k++){
+    const t=k/N;
+    let j=0;
+    while(j<n-2 && t>xs[j+1])j++;
+    const x0=xs[j],x1=xs[j+1];
+    const hh=Math.max(1e-9,(x1-x0)*len);
+    const u=Math.max(0,Math.min(1,(t-x0)/(x1-x0)));
+    const y0=ys[j],y1=ys[j+1],m0=ms[j],m1=ms[j+1];
+    const h00=2*u*u*u-3*u*u+1;
+    const h10=u*u*u-2*u*u+u;
+    const h01=-2*u*u*u+3*u*u;
+    const h11=u*u*u-u*u;
+    const d=h00*y0+h10*hh*m0+h01*y1+h11*hh*m1;
+    out.push({t,d:Math.max(0,d)});
+  }
+  return out;
+}
+function profileAssumedDepth(o){
+  if(o.depth && Number.isFinite(Number(o.depth.value))) return Number(o.depth.value);
+  const text=((o.owner||"")+" "+(o.type||"")).toLowerCase();
+  if(/telecom|kpn|odido/.test(text)) return 0.60;
+  if(/gas/.test(text)) return 1.00;
+  if(/water/.test(text)) return 1.20;
+  // Voor een volledig onbekende leiding houden we altijd 1,00 m als
+  // referentiediepte aan. De ingestelde vrije afstand komt daaronder.
+  return 1.00;
+}
+
+
+function curveDepthAt(samples,t){
+  if(!samples || !samples.length) return 0;
+  if(t<=samples[0].t) return samples[0].d;
+  if(t>=samples[samples.length-1].t) return samples[samples.length-1].d;
+  let lo=0,hi=samples.length-1;
+  while(lo<hi-1){
+    const mid=(lo+hi)>>1;
+    if(samples[mid].t<t) lo=mid; else hi=mid;
+  }
+  const a=samples[lo],b=samples[hi];
+  const u=(t-a.t)/Math.max(1e-9,b.t-a.t);
+  return a.d+(b.d-a.d)*u;
+}
+
+function curveLengths(samples, chord){
+  const out=[0];
+  let total=0;
+  for(let i=1;i<samples.length;i++){
+    const dx=(samples[i].t-samples[i-1].t)*chord;
+    const dy=samples[i].d-samples[i-1].d;
+    total += Math.hypot(dx,dy);
+    out.push(total);
+  }
+  return out;
+}
+
+function cumulativeCurveLengthAt(samples,lengths,t){
+  if(!samples || !samples.length) return 0;
+  if(t<=samples[0].t) return 0;
+  if(t>=samples[samples.length-1].t) return lengths[lengths.length-1];
+  let lo=0,hi=samples.length-1;
+  while(lo<hi-1){
+    const mid=(lo+hi)>>1;
+    if(samples[mid].t<t) lo=mid; else hi=mid;
+  }
+  const a=samples[lo],b=samples[hi];
+  const u=(t-a.t)/Math.max(1e-9,b.t-a.t);
+  return lengths[lo]+(lengths[hi]-lengths[lo])*u;
+}
+
+function renderProfileTable(samples){
+  const el=$("profileTable");
+  if(!el)return;
+  if(!boreStart || !boreEnd || !samples || !samples.length){el.innerHTML="";return;}
+  const chord=rdDistance(boreStart,boreEnd);
+  const lengths=curveLengths(samples,chord);
+  const points=[{t:0,label:"Start boring"}];
+  crossings.forEach((o,i)=>{
+    const owner=(o.owner&&o.owner!=="Onbekend")?o.owner:"Onbekend";
+    const type=o.type||"Overig";
+    points.push({t:o.t,label:`${owner} ${type}`.trim()});
+  });
+  points.push({t:1,label:"Einde boring"});
+  points.sort((a,b)=>a.t-b.t);
+  const napRaw=$("maaiveldNap")?.value;
+  const manualNap=napRaw!=="" && Number.isFinite(Number(napRaw)) ? Number(napRaw) : null;
+  const cols=points.map(p=>{
+    const d=curveDepthAt(samples,p.t);
+    const groundNap=terrainNapAt(p.t), baseNap=Number.isFinite(groundNap)?groundNap:manualNap;
+    return {p,d,nap:Number.isFinite(baseNap)?baseNap-d:null,bl:cumulativeCurveLengthAt(samples,lengths,p.t),ha:p.t*chord};
+  });
+  const fmt=v=>Number.isFinite(v)?v.toFixed(2):"—";
+  let html='<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html+='<thead><tr><th style="background:#eef3f8;border:1px solid #d6dde6;padding:7px;text-align:left">Parameter</th>';
+  cols.forEach(c=>html+=`<th style="background:#eef3f8;border:1px solid #d6dde6;padding:7px;text-align:center;white-space:nowrap">${esc(c.p.label)}</th>`);
+  html+='</tr></thead><tbody>';
+  const rows=[
+    ["Diepte onder de grond (m)",c=>`-${fmt(c.d)}`],
+    ["Hoogte t.o.v. NAP (m)",c=>c.nap===null?'—':fmt(c.nap)],
+    ["Lengte van de boring (m)",c=>fmt(c.bl)],
+    ["Afstand vanaf start boring (m)",c=>fmt(c.ha)]
+  ];
+  rows.forEach(([name,fn])=>{
+    html+=`<tr><th style="border:1px solid #d6dde6;padding:7px;text-align:left;background:#fafbfc">${name}</th>`;
+    cols.forEach(c=>html+=`<td style="border:1px solid #d6dde6;padding:7px;text-align:center">${fn(c)}</td>`);
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  html+=`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px;padding:8px 10px;background:#f3f6fa;border-radius:7px;font-weight:700">`+
+    `<span>Lengte van de boring: ${fmt(lengths[lengths.length-1])} m</span>`+
+    `<span>Horizontale afstand: ${fmt(chord)} m</span></div>`;
+  el.innerHTML=html;
+}
+
+function rdAlign(v, step=0.5){
+  return Math.floor(v/step)*step;
+}
+
+async function fetchAhnTerrainProfile(){
+  if(!boreStart||!boreEnd) throw new Error("Plaats eerst een startpunt en eindpunt van de boring.");
+  if(typeof GeoTIFF==="undefined") throw new Error("De AHN/GeoTIFF-bibliotheek is niet geladen. Controleer de internetverbinding.");
+  const x1=Number(boreStart[0]), y1=Number(boreStart[1]);
+  const x2=Number(boreEnd[0]), y2=Number(boreEnd[1]);
+  const minX=rdAlign(Math.min(x1,x2)-2,0.5), maxX=rdAlign(Math.max(x1,x2)+2,0.5);
+  const minY=rdAlign(Math.min(y1,y2)-2,0.5), maxY=rdAlign(Math.max(y1,y2)+2,0.5);
+  const width=Math.max(2,Math.round((maxX-minX)/0.5));
+  const height=Math.max(2,Math.round((maxY-minY)/0.5));
+  if(width*height>12000000) throw new Error("Het gekozen traject is te groot om het AHN-hoogtebestand in één keer op te halen.");
+  const url=new URL("https://service.pdok.nl/rws/ahn/wcs/v1_0");
+  url.searchParams.set("SERVICE","WCS"); url.searchParams.set("VERSION","1.0.0"); url.searchParams.set("REQUEST","GetCoverage");
+  url.searchParams.set("FORMAT","image/tiff"); url.searchParams.set("COVERAGE","dtm_05m"); url.searchParams.set("CRS","EPSG:28992"); url.searchParams.set("RESPONSE_CRS","EPSG:28992");
+  url.searchParams.set("BBOX",`${minX},${minY},${maxX},${maxY}`); url.searchParams.set("WIDTH",String(width)); url.searchParams.set("HEIGHT",String(height));
+  const resp=await fetch(url.toString());
+  if(!resp.ok) throw new Error(`AHN/PDOK gaf HTTP ${resp.status}.`);
+  const tiff=await GeoTIFF.fromArrayBuffer(await resp.arrayBuffer());
+  const image=await tiff.getImage();
+  const rasters=await image.readRasters({interleave:false,samples:[0]});
+  const data=rasters[0], iw=image.getWidth(), ih=image.getHeight();
+  const origin=image.getOrigin(), res=image.getResolution(), ox=origin[0], oy=origin[1];
+  const rx=Math.abs(res[0]), ry=Math.abs(res[1]), nodata=image.getGDALNoData();
+  function valueAt(x,y){
+    let px=Math.round((x-ox)/rx), py=Math.round((oy-y)/ry);
+    if(res[1]>0) py=Math.round((y-oy)/res[1]);
+    px=Math.max(0,Math.min(iw-1,px)); py=Math.max(0,Math.min(ih-1,py));
+    const vals=[];
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+      const xx=Math.max(0,Math.min(iw-1,px+dx)), yy=Math.max(0,Math.min(ih-1,py+dy));
+      const v=Number(data[yy*iw+xx]);
+      if(!Number.isFinite(v)) continue;
+      if(nodata!==null && nodata!==undefined && Number.isFinite(Number(nodata)) && Math.abs(v-Number(nodata))<1e-6) continue;
+      if(v < -100 || v > 1000) continue;
+      vals.push(v);
+    }
+    if(!vals.length) return null; vals.sort((a,b)=>a-b); return vals[Math.floor(vals.length/2)];
+  }
+  const len=rdDistance(boreStart,boreEnd), distances=[];
+  for(let m=0;m<=len+0.001;m+=3) distances.push(Math.min(m,len));
+  if(Math.abs(distances[distances.length-1]-len)>0.01) distances.push(len);
+  ahnProfile=distances.map(m=>{const t=len?m/len:0; return {t,m,nap:valueAt(x1+(x2-x1)*t,y1+(y2-y1)*t)};});
+  const valid=ahnProfile.filter(p=>Number.isFinite(p.nap));
+  if(!valid.length) throw new Error("Geen bruikbare maaiveldhoogte uit AHN gevonden voor dit traject.");
+  ahnTerrainLoaded=true; ahnTerrainSource="AHN/PDOK DTM (dtm_05m)";
+  const start=valid.find(p=>p.t===0)||valid[0], end=[...valid].reverse().find(p=>p.t===1)||valid[valid.length-1];
+  $("maaiveldNap").value=Number(start.nap).toFixed(2);
+  $("napStatus").innerHTML=`<b>NAP opgehaald.</b> Start: ${start.nap.toFixed(2)} m NAP · Einde: ${end.nap.toFixed(2)} m NAP · ${valid.length} meetpunten · bron: AHN/PDOK.`;
+  drawProfile();
+}
+
+function terrainNapAt(t){
+  if(!ahnTerrainLoaded||!ahnProfile.length) return null;
+  if(t<=ahnProfile[0].t) return ahnProfile[0].nap;
+  if(t>=ahnProfile[ahnProfile.length-1].t) return ahnProfile[ahnProfile.length-1].nap;
+  for(let i=1;i<ahnProfile.length;i++){
+    const a=ahnProfile[i-1],b=ahnProfile[i];
+    if(t<=b.t){
+      if(!Number.isFinite(a.nap)&&!Number.isFinite(b.nap)) return null;
+      if(!Number.isFinite(a.nap)) return b.nap; if(!Number.isFinite(b.nap)) return a.nap;
+      return a.nap+(b.nap-a.nap)*((t-a.t)/(b.t-a.t||1));
+    }
+  }
+  return null;
+}
+
+function drawProfile(targetId="profile"){
+  const c=$(targetId),ctx=c.getContext("2d");
+  const W=c.width,H=c.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,W,H);
+  ctx.font="12px Arial";ctx.textBaseline="alphabetic";
+  ctx.fillStyle="#17202a";
+  ctx.font="bold 15px Arial";
+  ctx.fillText(pipeSpecification(),20,22);
+  ctx.font="12px Arial";
+  ctx.fillText(boreSpecification(),20,40);
+
+  if(!boreStart||!boreEnd){
+    ctx.fillStyle="#17202a";
+    ctx.fillText("Plaats twee punten op de kaart om het boorprofiel te maken.",25,40);
+    return;
+  }
+
+  const len=Math.max(0.01,rdDistance(boreStart,boreEnd));
+  const padL=260,padR=150;
+  const top=180,graphBottom=300,rowTop=308,rowH=38;
+  // Vaste schaal: iedere meter krijgt exact dezelfde horizontale afstand.
+  // Hierdoor staan 3 m, 6 m, 9 m enz. altijd recht onder elkaar.
+  const PX_PER_M=35;
+  const profileWidth=Math.max(180,len*PX_PER_M);
+  const totalWidth=Math.max(W,padL+profileWidth+padR);
+  if(c.width!==Math.ceil(totalWidth)){
+    c.width=Math.ceil(totalWidth);
+    c.height=Math.max(H,580);
+  }
+  const drawW=c.width;
+  const usable=profileWidth;
+  const exitX=padL+usable;
+  const xAt=t=>padL+Math.max(0,Math.min(1,t))*usable;
+  const xAtDistance=m=>padL+Math.max(0,Math.min(len,m))*PX_PER_M;
+
+  // De boorlijn is één doorlopende, vloeiende curve.
+  // Alleen het diepste noodzakelijke KLIC-punt bepaalt het diepste punt van
+  // de boring. Alle andere kruisingen worden als controlepunten gebruikt,
+  // maar krijgen geen eigen knik of horizontaal stuk in de boorlijn.
+  const entryAngle=Math.max(0.1,Number($("entryAngle")?.value)||10);
+  const exitAngle=Math.max(0.1,Number($("exitAngle")?.value)||10);
+  const constraintDepth=o=>{
+    const d=profileAssumedDepth(o);
+    return Number.isFinite(d)?Math.max(0,d)+clearanceValue(o):1.00+clearanceValue(o);
+  };
+  const ordered=crossings.map(o=>({o,t:o.t,d:constraintDepth(o)})).sort((a,b)=>a.t-b.t);
+  // Alleen deze drie KLIC-referenties bepalen de vorm van de boring:
+  // eerste kruising, diepste kruising en laatste kruising.
+  // Alle overige leidingen blijven zichtbaar, maar worden geen ankerpunt.
+  const deepest=ordered.reduce((best,a)=>!best || a.d>best.d ? a : best,null);
+  const allConstraints=ordered.map(a=>a.d);
+
+  // Lees de door de gebruiker opgegeven begin- en einddiepte vóórdat ze
+  // ergens in de profielberekening worden gebruikt. Dit voorkomt de
+  // JavaScript TDZ-fout "Cannot access 'startDepth' before initialization".
+  const startDepth=Math.max(0,Number($("startDepth")?.value)||0);
+  const endDepth=Math.max(0,Number($("endDepth")?.value)||0);
+  const maxDepth=Math.max(5,...allConstraints,1.5,startDepth,endDepth);
+  const scale=(graphBottom-top)/maxDepth;
+  const yDepth=d=>top+Math.max(0,d)*scale;
+
+  // De boring wordt bepaald door drie KLIC-referenties:
+  // 1) de EERSTE kruising, 2) de DIEPSTE kruising en 3) de LAATSTE kruising.
+  // Alle andere kruisingen sturen geen eigen bochtpunt en veroorzaken dus
+  // geen zichtbare knikken. Ze blijven wel als controlemarkering in het profiel.
+  //
+  // De curve gaat vloeiend:
+  // maaiveld -> eerste leiding + vrije afstand ->
+  // diepste leiding + vrije afstand ->
+  // laatste leiding + vrije afstand -> maaiveld.
+  //
+  // buildBoreCurve gebruikt monotone Hermite-segmenten zodat de boring vóór
+  // het diepste punt alleen daalt en erna alleen stijgt. Het diepste punt
+  // blijft exact de diepste KLIC-eis + de gekozen vrije afstand.
+  // VASTE ANKERS VOOR DE VLOEIENDE BORING:
+  // A/startdiepte -> eerste KLIC -> diepste KLIC -> laatste KLIC -> B/einddiepte.
+  // Dubbele ankers worden samengevoegd; overige KLIC-kruisingen doen niets met de vorm.
+  // A en B zijn harde eindpunten: de gebruiker bepaalt exact hoe diep de boring
+  // bij intrede en uittrede onder maaiveld ligt. Deze waarden mogen door geen
+  // KLIC-anker of nominale boog worden overschreven.
+  const startD=Math.max(0,Number(startDepth)||0);
+  const endD=Math.max(0,Number(endDepth)||0);
+  const finalAnchors=[{t:0,d:startD}];
+  if(ordered.length){
+    const first=ordered[0];
+    const last=ordered[ordered.length-1];
+    const refs=[first,deepest,last];
+    for(const ref of refs){
+      if(!ref) continue;
+      const t=Math.max(0,Math.min(1,ref.t));
+      const d=Math.max(0,ref.d);
+      const prev=finalAnchors[finalAnchors.length-1];
+      if(Math.abs(prev.t-t)<1e-7){
+        // Op A/B blijft de door de gebruiker gekozen start/einddiepte leidend.
+        if(t>1e-7 && t<1-1e-7) prev.d=Math.max(prev.d,d);
+      }else if(t>1e-7 && t<1-1e-7){
+        finalAnchors.push({t,d});
+      }
+    }
+  }
+  finalAnchors.push({t:1,d:endD});
+
+  // Sorteer en voeg eventuele dubbele t-posities samen.
+  finalAnchors.sort((a,b)=>a.t-b.t);
+  const cleanAnchors=[];
+  for(const a of finalAnchors){
+    const prev=cleanAnchors[cleanAnchors.length-1];
+    if(prev && Math.abs(prev.t-a.t)<1e-7){
+      // A en B blijven exact de ingestelde diepte; tussenliggende dubbele referenties
+      // nemen de strengste veiligheidsdiepte.
+      if(a.t>1e-7 && a.t<1-1e-7) prev.d=Math.max(prev.d,a.d);
+    }else{
+      cleanAnchors.push({t:a.t,d:a.d});
+    }
+  }
+
+  const samples=buildBoreCurve(cleanAnchors,entryAngle,exitAngle);
+  // Harde eindpunten: door afronding/interpolatie mogen A en B nooit van de
+  // ingevoerde diepte afwijken. Dit maakt de begin- en einddiepte exact zichtbaar
+  // in zowel het schermprofiel als het PDF-voorbeeld.
+  if(samples.length){
+    samples[0].d=startD;
+    samples[samples.length-1].d=endD;
+  }
+  const lengths=curveLengths(samples,len);
+
+  // Raster
+  ctx.strokeStyle="#c8c8c8";ctx.lineWidth=1;ctx.setLineDash([]);
+  for(let d=0;d<=Math.ceil(maxDepth);d+=1){
+    const y=yDepth(d);
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(exitX,y);ctx.stroke();
+    ctx.fillStyle="#777";ctx.font="12px Arial";ctx.textAlign="right";
+    ctx.fillText(`-${d.toFixed(1)}`,padL-10,y+4);
+  }
+
+  // Meetkolommen: iedere 3 meter + exact eindpunt.
+  const distances=[];
+  for(let m=0;m<=len+0.001;m+=3) distances.push(Math.min(m,len));
+  if(Math.abs(distances[distances.length-1]-len)>0.01) distances.push(len);
+  distances.forEach(m=>{
+    const x=xAtDistance(m);
+    ctx.strokeStyle="#d0d0d0";ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,rowTop+rowH*4+55);ctx.stroke();
+  });
+
+  // Maaiveld
+  ctx.strokeStyle="#00bfa5";ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(padL,top);ctx.lineTo(exitX,top);ctx.stroke();
+  ctx.fillStyle="#777";ctx.font="13px Arial";ctx.textAlign="left";
+  // Intrede links naast het begin van de boring.
+  ctx.fillText("A. INTREDE",padL-125,top-14);
+  ctx.fillText(`Startdiepte ${startDepth.toFixed(2)} m`,padL-125,top+2);
+  // Uittrede rechts naast het einde van de boring, zodat beide teksten
+  // symmetrisch naast hun eigen eindpunt staan.
+  ctx.fillText("B. UITTREDE",exitX+10,top-14);
+  ctx.fillText(`Einddiepte ${endDepth.toFixed(2)} m`,exitX+10,top+2);
+  // De ingestelde hoeken worden rechtstreeks bij de in- en uittrede getoond.
+  ctx.font="bold 12px Arial";ctx.fillStyle="#ff0000";
+  ctx.fillText(`↘ ${entryAngle.toFixed(0)}°`,padL+12,top+32);
+  ctx.textAlign="right";ctx.fillText(`${exitAngle.toFixed(0)}° ↗`,exitX-12,top+32);
+  ctx.textAlign="left";ctx.font="12px Arial";ctx.fillStyle="#777";
+
+  // Geen aparte maatvoering "Bedekking" in het boorprofiel.
+  // De gebruiker heeft alleen de boorlijn, KLIC-kruisingen en dieptes nodig.
+
+  // KLIC-kruisingen: ronde markering + blauwe pijl/label.
+  // De naam wordt alleen als netbeheerder getoond. De pijl loopt altijd
+  // recht omhoog vanaf het KLIC-punt. Als twee labels elkaar horizontaal
+  // raken, gaat alleen het label een regel omhoog; de pijl blijft verticaal.
+  const labelBaseY=top-14;
+  const laneStep=18;
+  const minLabelGap=8;
+  const labelData=[];
+
+  crossings.forEach((o,i)=>{
+    const x=xAt(o.t);
+    const d=Number.isFinite(profileAssumedDepth(o))?Math.max(0,profileAssumedDepth(o)):Math.max(0,nominalArcDepth(o.t));
+    const y=yDepth(d);
+    const type=(o.type||"").toLowerCase();
+    let pipeColor="#918a6f";
+    if(type.includes("laagspanning")) pipeColor="#960000";
+    else if(type.includes("middenspanning")) pipeColor="#c80000";
+    else if(type.includes("hoogspanning")) pipeColor="#ff0000";
+    else if(type.includes("gas lage")) pipeColor="#ffd750";
+    else if(type.includes("gas hoge")) pipeColor="#ffaf3c";
+    else if(type.includes("gas")) pipeColor="#ffd750";
+    else if(type.includes("water")) pipeColor="#0000ff";
+    else if(type.includes("riool druk")) pipeColor="#800080";
+    else if(type.includes("riool")) pipeColor="#ba38a8";
+    else if(type.includes("warmte")) pipeColor="#008080";
+    else if(type.includes("telecom") || type.includes("datatransport")) pipeColor="#00ff00";
+    else if(type.includes("elektr")) pipeColor="#c80000";
+
+    // De echte KLIC-markering blijft op de juiste leidingdiepte staan.
+    ctx.fillStyle=pipeColor;ctx.strokeStyle="#333";ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
+
+    const owner=(o.owner&&o.owner!=="Onbekend")?String(o.owner).trim():"Onbekend";
+    // Toon in het boorprofiel uitsluitend de naam van de netbeheerder.
+    // KLIC-object-/referentienummers (lange numerieke codes) worden nooit als label getoond.
+    const label=owner.replace(/\b[A-Za-z]?\d{6,}\b/g,"").replace(/\s{2,}/g," ").replace(/[\s,;:-]+$/g,"").trim() || "Onbekend";
+    ctx.font="12px Arial";
+    const textWidth=Math.max(45,ctx.measureText(label).width);
+
+    // Per netbeheerder is één naam voldoende in het profiel.
+    // Alle afzonderlijke KLIC-markeringen blijven wel zichtbaar.
+    // Zo krijg je bijvoorbeeld niet zeven keer Ziggo B.V. boven dezelfde kruising.
+    const key=owner.trim().toLowerCase();
+    const existing=labelData.find(g=>g.ownerKey===key);
+    if(!existing){
+      labelData.push({o,x,y,label,textWidth,ownerKey:key});
+    }
+  });
+
+  // Geef ieder label de laagste mogelijke regel. Alleen bij horizontale
+  // overlap gaat het label omhoog. Daardoor blijven labels naast elkaar
+  // zolang dat leesbaar kan.
+  labelData.sort((a,b)=>a.x-b.x);
+  const leftLimit=padL+8;
+  const rightLimit=exitX-8;
+  const lanes=[];
+
+  labelData.forEach(d=>{
+    let cx=Math.max(leftLimit+d.textWidth/2,Math.min(rightLimit-d.textWidth/2,d.x));
+    let lane=0;
+    while(true){
+      const left=cx-d.textWidth/2-4;
+      const right=cx+d.textWidth/2+4;
+      const conflict=(lanes[lane]||[]).some(q=>left < q.right+minLabelGap && right > q.left-minLabelGap);
+      if(!conflict) break;
+      lane++;
+      // Op hogere regels houden we het label horizontaal zoveel mogelijk
+      // boven zijn eigen pijl. Als de rand geraakt wordt, schuiven we beperkt.
+      cx=Math.max(leftLimit+d.textWidth/2,Math.min(rightLimit-d.textWidth/2,d.x));
+    }
+    if(!lanes[lane]) lanes[lane]=[];
+    lanes[lane].push({left:cx-d.textWidth/2-4,right:cx+d.textWidth/2+4});
+    d.cx=cx;
+    d.lane=lane;
+  });
+
+  labelData.forEach(d=>{
+    const labelY=labelBaseY-d.lane*laneStep;
+    const cx=d.cx;
+
+    // Pijl altijd recht omhoog vanaf de leiding naar het label.
+    ctx.strokeStyle="#0033cc";ctx.fillStyle="#0033cc";ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(d.x,d.y-7);ctx.lineTo(d.x,labelY+5);ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(d.x,labelY+5);
+    ctx.lineTo(d.x-4,labelY+12);
+    ctx.lineTo(d.x+4,labelY+12);
+    ctx.closePath();ctx.fill();
+
+    // Witte achtergrond zodat labels goed leesbaar blijven.
+    ctx.fillStyle="#ffffff";
+    ctx.fillRect(cx-d.textWidth/2-4,labelY-14,d.textWidth+8,17);
+    ctx.font="12px Arial";ctx.textAlign="center";ctx.fillStyle="#0033cc";
+    ctx.fillText(d.label,cx,labelY);
+    ctx.textAlign="left";
+  });
+
+  // Rode vloeiende boorlijn.
+  ctx.strokeStyle="#ff0000";ctx.lineWidth=3;ctx.lineJoin="round";ctx.lineCap="round";
+  ctx.beginPath();
+  samples.forEach((p,i)=>{const x=xAt(p.t),y=yDepth(p.d);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
+  ctx.stroke();
+  ctx.fillStyle="#ff0000";
+  ctx.beginPath();ctx.arc(padL,yDepth(startDepth),4,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(exitX,yDepth(endDepth),4,0,Math.PI*2);ctx.fill();
+
+
+  // Vier rijen, rechtstreeks onder de grafiek zoals in het voorbeeld.
+  const napRaw=$("maaiveldNap")?.value;
+  const manualNap=napRaw!=="" && Number.isFinite(Number(napRaw)) ? Number(napRaw) : null;
+  const rowLabels=[
+    "Hartlijn Boring t.o.v. MV (m)",
+    "Hartlijn Boring t.o.v. NAP (m)",
+    "Geboorde lengte (m)",
+    "Horiz. afstand t.o.v. Intrede (m)"
+  ];
+  const rowPoints=distances.map(m=>{
+    const t=len>0?m/len:0;
+    const d=curveDepthAt(samples,t);
+    const groundNap=terrainNapAt(t), baseNap=Number.isFinite(groundNap)?groundNap:manualNap;
+    return {t,d,nap:Number.isFinite(baseNap)?baseNap-d:null,bl:cumulativeCurveLengthAt(samples,lengths,t),ha:m};
+  });
+
+  for(let r=0;r<4;r++){
+    const y0=rowTop+r*rowH;
+    ctx.strokeStyle="#c8c8c8";ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,y0);ctx.lineTo(W,y0);ctx.stroke();
+    ctx.fillStyle="#777";ctx.font="14px Arial";ctx.textAlign="right";
+    ctx.fillText(rowLabels[r],padL-12,y0+24);
+    ctx.textAlign="center";
+    rowPoints.forEach(p=>{
+      let val="—";
+      if(r===0) val=`-${p.d.toFixed(2)}`;
+      else if(r===1) val=p.nap===null?"—":p.nap.toFixed(2);
+      else if(r===2) val=p.bl.toFixed(2);
+      else if(r===3) val=p.ha.toFixed(2);
+      ctx.fillStyle="#555";ctx.font="12px Arial";ctx.fillText(val,xAtDistance(p.ha),y0+24);
+    });
+  }
+  ctx.strokeStyle="#c8c8c8";ctx.beginPath();ctx.moveTo(0,rowTop+4*rowH);ctx.lineTo(W,rowTop+4*rowH);ctx.stroke();
+  ctx.fillStyle="#777";ctx.font="12px Arial";ctx.textAlign="left";
+  ctx.fillText("0.00",padL-10,rowTop+4*rowH+16);
+  ctx.textAlign="right";ctx.fillText(`${len.toFixed(2)} m`,exitX,rowTop+4*rowH+16);ctx.textAlign="left";
+
+  $("profileTable").innerHTML=`<div class="note" style="display:flex;gap:24px;flex-wrap:wrap"><b>A. Intrede:</b> ${startDepth.toFixed(2)} m onder maaiveld · <b>hoek ${entryAngle.toFixed(0)}°</b> <b>B. Uittrede:</b> ${endDepth.toFixed(2)} m onder maaiveld · <b>hoek ${exitAngle.toFixed(0)}°</b></div>`;
+  if($("angleSummary")) $("angleSummary").value=`A ${entryAngle.toFixed(0)}° · B ${exitAngle.toFixed(0)}°`;
+}
+
+function getStreetViewKey(){
+  return ($("googleStreetViewKey")?.value?.trim() || localStorage.getItem("klic_google_streetview_key") || "").trim();
+}
+
+function bearingBetween(a,b){
+  const lat1=a.lat*Math.PI/180, lat2=b.lat*Math.PI/180;
+  const dLon=(b.lng-a.lng)*Math.PI/180;
+  const y=Math.sin(dLon)*Math.cos(lat2);
+  const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+
+function googleStreetViewUrl(latlng, heading, key){
+  const p=new URLSearchParams({
+    size:"640x360",
+    location:`${latlng.lat},${latlng.lng}`,
+    heading:String(Math.round(heading)),
+    pitch:"0",
+    fov:"80",
+    return_error_code:"true",
+    key
+  });
+  return `https://maps.googleapis.com/maps/api/streetview?${p.toString()}`;
+}
+
+function googleMapsStreetViewLink(latlng){
+  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${latlng.lat},${latlng.lng}`;
+}
+
+async function streetViewMetadata(latlng,key){
+  const url=`https://maps.googleapis.com/maps/api/streetview/metadata?location=${encodeURIComponent(`${latlng.lat},${latlng.lng}`)}&key=${encodeURIComponent(key)}`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error(`Google metadata HTTP ${r.status}`);
+  return await r.json();
+}
+
+function streetViewStatusText(meta,label){
+  const st=meta?.status;
+  if(st==="OK") return `${label}: Street View gevonden (${meta.location?.lat?.toFixed?.(6) ?? "?"}, ${meta.location?.lng?.toFixed?.(6) ?? "?"}).`;
+  if(st==="ZERO_RESULTS") return `${label}: geen Street View binnen ongeveer 50 meter van dit punt.`;
+  if(st==="REQUEST_DENIED") return `${label}: Google weigert de aanvraag. Controleer of Street View Static API is ingeschakeld en of deze API-key voor jouw GitHub Pages-website is toegestaan.`;
+  if(st==="OVER_QUERY_LIMIT") return `${label}: Google geeft OVER_QUERY_LIMIT. Controleer quota/billing.`;
+  return `${label}: Google geeft status ${st||"onbekend"}.`;
+}
+
+function updateEvWarnings(){
+  const startBox=$("evWarningStart"), endBox=$("evWarningEnd");
+  [startBox,endBox].forEach(el=>{ if(el){el.classList.remove("show"); el.innerHTML="";} });
+  evWarnings=[];
+  if(!boreStart||!boreEnd||!crossings.length) return;
+
+  const evCrossings=crossings.filter(o=>o.ev);
+  if(!evCrossings.length) return;
+
+  const unique=[];
+  const seen=new Set();
+  for(const o of evCrossings){
+    const key=(o.owner||"Onbekende netbeheerder")+"|"+(o.type||"Overig");
+    if(!seen.has(key)){seen.add(key);unique.push(o);}
+  }
+
+  unique.forEach(o=>{
+    const where=o.t<=0.15?"start":(o.t>=0.85?"end":"line");
+    evWarnings.push({owner:o.owner||"Onbekende netbeheerder",type:o.type||"Overig",where});
+  });
+
+  const render=(items,el,locationText)=>{
+    if(!el||!items.length)return;
+    el.innerHTML="<b>⚠ LET OP – EV-MELDING</b>"+
+      items.map(x=>`<small>${esc(x.owner)} · ${esc(x.type)}${locationText?" · "+locationText:""}</small>`).join("");
+    el.classList.add("show");
+  };
+  render(evWarnings.filter(x=>x.where==="start"),startBox,"bij intrede");
+  render(evWarnings.filter(x=>x.where==="end"),endBox,"bij uittrede");
+
+  const middle=evWarnings.filter(x=>x.where==="line");
+  if(middle.length){
+    const target=endBox || startBox;
+    render(middle,target,"op de boorlijn");
+  }
+}
+
+async function updateStreetViews(){
+  const status=$("streetviewStatus");
+  if(!boreStart || !boreEnd){
+    return;
+  }
+  const sw=rdToWgs(boreStart[0],boreStart[1]);
+  const ew=rdToWgs(boreEnd[0],boreEnd[1]);
+  const startLL=L.latLng(sw[0],sw[1]);
+  const endLL=L.latLng(ew[0],ew[1]);
+  const heading=bearingBetween(startLL,endLL);
+  const key=getStreetViewKey();
+  const startImg=$("streetviewStart"), endImg=$("streetviewEnd");
+  if(!key){
+    // Geen sleutel betekent alleen dat Google geen Static Street View-afbeelding
+    // kan leveren; de Street View-vakken blijven zichtbaar.
+    return;
+  }
+  startImg.removeAttribute("src"); endImg.removeAttribute("src");
+  status.textContent="Street View wordt gecontroleerd...";
+
+  try{
+    const [sm,em]=await Promise.all([
+      streetViewMetadata(startLL,key),
+      streetViewMetadata(endLL,key)
+    ]);
+
+    if(sm?.status==="OK") startImg.src=googleStreetViewUrl(startLL,heading,key);
+    if(em?.status==="OK") endImg.src=googleStreetViewUrl(endLL,(heading+180)%360,key);
+
+    startImg.onerror=()=>{ console.warn("Street View intrede kon niet worden geladen"); };
+    endImg.onerror=()=>{ console.warn("Street View uittrede kon niet worden geladen"); };
+  }catch(err){
+    console.error("Street View metadata:",err);
+  }
+}
+
+function pdfScaleDenom(geoWidthM, displayWidthMm){
+  if(!Number.isFinite(geoWidthM)||geoWidthM<=0||displayWidthMm<=0) return null;
+  return Math.max(1, geoWidthM*1000/displayWidthMm);
+}
+function niceScaleDenom(raw){
+  if(!Number.isFinite(raw)||raw<=0) return null;
+  const steps=[50,100,200,250,500,750,1000,1250,1500,2000,2500,5000,7500,10000];
+  for(const n of steps) if(n>=raw) return n;
+  return Math.ceil(raw/1000)*1000;
+}
+function getBoreMapBounds(marginM=12){
+  if(!boreStart||!boreEnd) return null;
+  const pts=[boreStart,boreEnd];
+  for(const o of klicObjects||[]) for(const p of (o.geom||[])){
+    // Alleen objecten dichtbij de boring meenemen voor een leesbare situatiekaart.
+    const minX=Math.min(boreStart[0],boreEnd[0])-marginM;
+    const maxX=Math.max(boreStart[0],boreEnd[0])+marginM;
+    const minY=Math.min(boreStart[1],boreEnd[1])-marginM;
+    const maxY=Math.max(boreStart[1],boreEnd[1])+marginM;
+    if(p[0]>=minX&&p[0]<=maxX&&p[1]>=minY&&p[1]<=maxY) pts.push(p);
+  }
+  let minX=Math.min(...pts.map(p=>p[0])), maxX=Math.max(...pts.map(p=>p[0]));
+  let minY=Math.min(...pts.map(p=>p[1])), maxY=Math.max(...pts.map(p=>p[1]));
+  const w=Math.max(10,maxX-minX), h=Math.max(10,maxY-minY);
+  const padX=Math.max(marginM,w*.10), padY=Math.max(marginM,h*.10);
+  return {minX:minX-padX,maxX:maxX+padX,minY:minY-padY,maxY:maxY+padY};
+}
+
+async function drawSituationCanvas(){
+  const canvas=document.createElement("canvas");
+  canvas.width=1800; canvas.height=850;
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+  const info=klicBackgroundInfo;
+  if(info?.url && info.rdBounds && boreStart&&boreEnd){
+    const img=new Image();
+    img.src=info.url;
+    await new Promise((resolve)=>{
+      img.onload=()=>resolve(true);
+      img.onerror=()=>resolve(false);
+    });
+    const bb=getBoreMapBounds(10);
+    const sx=canvas.width/(bb.maxX-bb.minX), sy=canvas.height/(bb.maxY-bb.minY);
+    const toXY=p=>[(p[0]-bb.minX)*sx,canvas.height-(p[1]-bb.minY)*sy];
+    // Crop de KLIC-topo uit de originele KLIC PNG op RD-coördinaten.
+    const ix0=Math.max(0,(bb.minX-info.rdBounds.minX)/(info.rdBounds.maxX-info.rdBounds.minX)*img.width);
+    const ix1=Math.min(img.width,(bb.maxX-info.rdBounds.minX)/(info.rdBounds.maxX-info.rdBounds.minX)*img.width);
+    const iy0=Math.max(0,(info.rdBounds.maxY-bb.maxY)/(info.rdBounds.maxY-info.rdBounds.minY)*img.height);
+    const iy1=Math.min(img.height,(info.rdBounds.maxY-bb.minY)/(info.rdBounds.maxY-info.rdBounds.minY)*img.height);
+    if(img.naturalWidth>0 && ix1>ix0&&iy1>iy0){
+      try{ ctx.drawImage(img,ix0,iy0,ix1-ix0,iy1-iy0,0,0,canvas.width,canvas.height); }catch(e){ console.warn("KLIC-achtergrond kon niet in preview worden getekend",e); }
+    }
+
+    for(const o of klicObjects){
+      if(!o.geom?.length) continue;
+      ctx.beginPath();
+      let any=false;
+      o.geom.forEach((p,i)=>{
+        const q=toXY(p);
+        if(q[0]<-30||q[0]>canvas.width+30||q[1]<-30||q[1]>canvas.height+30)return;
+        if(i===0)ctx.moveTo(q[0],q[1]);else ctx.lineTo(q[0],q[1]); any=true;
+      });
+      if(!any)continue;
+      ctx.strokeStyle=klicKleur(o);ctx.lineWidth=3;ctx.globalAlpha=.9;
+      const status=String(o.status||"functional").toLowerCase();
+      ctx.setLineDash(status==="disused"?[40,12,8,12]:(status==="projected"?[4,16]:[]));
+      ctx.stroke();ctx.setLineDash([]);
+    }
+    if(boreStart&&boreEnd){
+      const a=toXY(boreStart),z=toXY(boreEnd);
+      ctx.strokeStyle="#e00000";ctx.lineWidth=6;ctx.globalAlpha=1;
+      ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(z[0],z[1]);ctx.stroke();
+      ctx.fillStyle="#e00000";ctx.font="bold 24px Arial";
+      ctx.fillText("A. INTREDE",a[0]+10,a[1]-12);
+      ctx.fillText("B. UITTREDE",z[0]+10,z[1]-12);
+    }
+    ctx.globalAlpha=1;
+    return {canvas,bounds:bb,geoWidthM:bb.maxX-bb.minX,geoHeightM:bb.maxY-bb.minY};
+  }
+  ctx.fillStyle="#eef2f7";ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle="#b8c0ca";ctx.lineWidth=2;ctx.strokeRect(2,2,canvas.width-4,canvas.height-4);
+  ctx.fillStyle="#17202a";ctx.font="bold 28px Arial";
+  ctx.fillText("KLIC-situatiekaart",30,45);
+  ctx.font="20px Arial";
+  ctx.fillText("KLIC-achtergrondkaart niet beschikbaar",30,78);
+  if(boreStart&&boreEnd){
+    const bb=getBoreMapBounds(10);
+    const sx=canvas.width/(bb.maxX-bb.minX), sy=canvas.height/(bb.maxY-bb.minY);
+    const toXY=p=>[(p[0]-bb.minX)*sx,canvas.height-(p[1]-bb.minY)*sy];
+    const a=toXY(boreStart),z=toXY(boreEnd);
+    ctx.strokeStyle="#e00000";ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(z[0],z[1]);ctx.stroke();
+    ctx.fillStyle="#e00000";ctx.font="bold 24px Arial";ctx.fillText("A. INTREDE",a[0]+10,a[1]-12);ctx.fillText("B. UITTREDE",z[0]+10,z[1]-12);
+    return {canvas,bounds:bb,geoWidthM:bb.maxX-bb.minX,geoHeightM:bb.maxY-bb.minY};
+  }
+  return {canvas,bounds:null,geoWidthM:null,geoHeightM:null};
+}
+
+function drawPdfBoreSection(pdf,x,y,w,h){
+  pdf.setDrawColor(40,40,40);pdf.setLineWidth(.35);
+  pdf.setFont("helvetica","bold");pdf.setFontSize(8);pdf.setTextColor(20,20,20);
+  pdf.text("DOORSNEDE BOORGAT",x,y+5);
+  pdf.setFont("helvetica","normal");pdf.setFontSize(6.5);
+  const pilot=Number($("pilotDiameter")?.value)||0;
+  const ream=Number($("reamDiameter")?.value)||0;
+  const pipe=pipeDiameterValue();
+  const cx=x+w/2, cy=y+29;
+  const outerD=Math.min(34,h-35), outerR=outerD/2;
+  pdf.setDrawColor(40,40,120);pdf.setLineWidth(.8);pdf.circle(cx,cy,outerR,"S");
+  if(ream>0){
+    const rr=Math.max(outerR*0.72,outerR*Math.min(.92,Math.max(.15,ream/(ream||1))));
+    pdf.setDrawColor(80,80,160);pdf.setLineWidth(.45);pdf.setLineDashPattern([2,1],0);pdf.circle(cx,cy,rr,"S");pdf.setLineDashPattern([],0);
+  }
+  const pr=Math.max(2.5,Math.min(outerR*.42,outerR*(pipe>0?pipe/Math.max(ream||pipe,pipe*1.25):.35)));
+  pdf.setFillColor(235,235,235);pdf.setDrawColor(0,0,0);pdf.setLineWidth(.5);pdf.circle(cx,cy,pr,"FD");
+  pdf.setFont("helvetica","bold");pdf.setFontSize(6.5);pdf.setTextColor(20,20,20);
+  pdf.text(`Boring Ø ${ream||"?"} mm`,cx,cy+outerR+9,{align:"center"});
+  pdf.setFont("helvetica","normal");pdf.text(`Buis ${pipe||"?"} mm`,cx,cy+outerR+15,{align:"center"});
+  pdf.setFontSize(6);pdf.text(`Pilot Ø ${pilot||"?"} mm`,x+2,y+h-9);pdf.text(`Ruimen Ø ${ream||"?"} mm`,x+2,y+h-4);
+}
+
+function drawPdfPipeInfo(pdf,x,y,w,h){
+  pdf.setFont("helvetica","bold");pdf.setFontSize(8);pdf.setTextColor(20,20,20);pdf.text("BUIS- EN BORINGINFO",x,y+5);
+  pdf.setFont("helvetica","normal");pdf.setFontSize(7);
+  const rows=[
+    ["Buis",pipeSpecification()],
+    ["Pilotboring",`Ø ${Number($("pilotDiameter")?.value)||"?"} mm`],
+    ["Ruimen",`Ø ${Number($("reamDiameter")?.value)||"?"} mm`],
+    ["Boorlengte",boreStart&&boreEnd?`${rdDistance(boreStart,boreEnd).toFixed(1)} m`:"—"],
+    ["Intredehoek",`${Number($("entryAngle")?.value)||0}°`],
+    ["Uittredehoek",`${Number($("exitAngle")?.value)||0}°`]
+  ];
+  let yy=y+14;
+  for(const [a,b] of rows){pdf.setFont("helvetica","bold");pdf.text(a,x,yy);pdf.setFont("helvetica","normal");pdf.text(String(b),x+23,yy);yy+=7;}
+}
+
+function drawPdfProjectInfo(pdf,x,y,w,h){
+  pdf.setFont("helvetica","bold");pdf.setFontSize(8);pdf.text("PROJECT",x,y+5);
+  pdf.setFont("helvetica","normal");pdf.setFontSize(7);
+  const txt=[
+    adres||"KLIC boorprofiel",
+    pipeSpecification(),
+    `Boorlengte ${boreStart&&boreEnd?rdDistance(boreStart,boreEnd).toFixed(1):"—"} m`,
+    `Datum ${new Date().toLocaleDateString("nl-NL")}`
+  ];
+  let yy=y+14; for(const t of txt){pdf.text(String(t),x,yy,{maxWidth:w});yy+=8;}
+}
+
+function showPdfPreview(){
+  if(!boreStart||!boreEnd){alert("Plaats eerst een startpunt en eindpunt van de boring.");return;}
+  const card=$("pdfPreviewCard"), out=$("pdfPreviewCanvas");
+  if(!card||!out)return;
+  card.style.display="block";
+  card.scrollIntoView({behavior:"smooth",block:"start"});
+
+  const ctx=out.getContext("2d");
+  if(!ctx){alert("Het PDF-voorbeeld kan niet worden getekend in deze browser.");return;}
+  const W=1587,H=1123;
+  ctx.clearRect(0,0,W,H);ctx.fillStyle="#fff";ctx.fillRect(0,0,W,H);
+
+  // A4 landscape: vaste kolommen en vakken. Alles wordt synchroon getekend;
+  // een externe afbeelding kan het voorbeeld dus nooit blokkeren.
+  const m=24,gap=18,leftW=329,rightX=m+leftW+gap,rightW=W-rightX-m;
+  const topY=18,topH=295,profileY=topY+topH+19,profileH=H-profileY-m-12;
+
+  ctx.strokeStyle="#969696";ctx.lineWidth=1.5;ctx.strokeRect(m,m,leftW,H-2*m);
+
+  // LINKERKOLOM
+  const bx=m+18,by=m+18,bw=leftW-36,bh=235;
+  ctx.strokeStyle="#777";ctx.lineWidth=1;ctx.strokeRect(bx,by,bw,bh);
+  ctx.fillStyle="#141414";ctx.font="bold 18px Arial";ctx.fillText("DOORSNEDE BOORGAT",bx+10,by+25);
+  const cx=bx+bw/2,cy=by+122;
+  ctx.strokeStyle="#333";ctx.lineWidth=2;ctx.strokeRect(cx-92,cy-45,184,90);
+  ctx.strokeStyle="#888";ctx.setLineDash([8,5]);ctx.beginPath();ctx.moveTo(cx-115,cy);ctx.lineTo(cx+115,cy);ctx.stroke();ctx.setLineDash([]);
+  let pipe=Number($("pipeDiameter")?.value)||110;
+  if($("pipeDiameter")?.value==="custom") pipe=Number($("pipeDiameterCustom")?.value)||110;
+  ctx.fillStyle="#ededed";ctx.strokeStyle="#111";ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,Math.max(13,Math.min(34,pipe/4)),0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#141414";ctx.font="bold 15px Arial";ctx.textAlign="center";ctx.fillText(`Buis Ø ${pipe||"?"} mm`,cx,cy+7);ctx.textAlign="left";
+  ctx.font="14px Arial";ctx.fillText(`Pilotboring Ø ${Number($("pilotDiameter")?.value)||"?"} mm`,bx+10,by+bh-48);ctx.fillText(`Ruimen Ø ${Number($("reamDiameter")?.value)||"?"} mm`,bx+10,by+bh-24);
+
+  let yy=by+bh+35;
+  ctx.fillStyle="#141414";ctx.font="bold 17px Arial";ctx.fillText("BUIS- EN BORINGINFO",bx,yy);yy+=25;
+  ctx.font="14px Arial";
+  const info=[
+    ["Buis",pipeSpecification()],
+    ["Boorlengte",`${rdDistance(boreStart,boreEnd).toFixed(1)} m`],
+    ["Intredehoek",`${Number($("entryAngle")?.value)||0}°`],
+    ["Uittredehoek",`${Number($("exitAngle")?.value)||0}°`]
+  ];
+  for(const [a,b] of info){ctx.font="bold 14px Arial";ctx.fillText(a,bx,yy);ctx.font="14px Arial";ctx.fillText(String(b),bx+92,yy);yy+=23;}
+  yy+=12;ctx.font="bold 17px Arial";ctx.fillText("PROJECT",bx,yy);yy+=25;ctx.font="14px Arial";
+  [adres||"KLIC boorprofiel",pipeSpecification(),`Datum ${new Date().toLocaleDateString("nl-NL")}`].forEach(t=>{ctx.fillText(String(t),bx,yy);yy+=23;});
+
+  // RECHTERKANT: eerst de vakken tekenen, dus altijd zichtbaar.
+  ctx.strokeStyle="#787878";ctx.lineWidth=1.5;
+  ctx.strokeRect(rightX,topY,rightW,topH);
+  ctx.strokeRect(rightX,profileY,rightW,profileH);
+
+  // Hulpfunctie voor de situatiekaart. Geen await en geen Promise.
+  function drawSituationPreview(){
+    ctx.save();
+    ctx.fillStyle="#eef2f7";ctx.fillRect(rightX+2,topY+2,rightW-4,topH-4);
+    const bb=getBoreMapBounds(10);
+    if(!bb){
+      ctx.fillStyle="#17202a";ctx.font="bold 20px Arial";ctx.fillText("KLIC-SITUATIEKAART",rightX+18,topY+35);
+      ctx.restore();return;
+    }
+    const sx=rightW/(bb.maxX-bb.minX), sy=topH/(bb.maxY-bb.minY);
+    const toXY=p=>[rightX+(p[0]-bb.minX)*sx,topY+topH-(p[1]-bb.minY)*sy];
+
+    // KLIC PNG alleen tekenen als deze al geladen is. Anders worden de lijnen
+    // meteen getekend en wordt de achtergrond later toegevoegd.
+    const img=window.__previewKlicImage;
+    const infoBg=klicBackgroundInfo;
+    if(img?.complete && img.naturalWidth>0 && infoBg?.rdBounds){
+      const ix0=Math.max(0,(bb.minX-infoBg.rdBounds.minX)/(infoBg.rdBounds.maxX-infoBg.rdBounds.minX)*img.width);
+      const ix1=Math.min(img.width,(bb.maxX-infoBg.rdBounds.minX)/(infoBg.rdBounds.maxX-infoBg.rdBounds.minX)*img.width);
+      const iy0=Math.max(0,(infoBg.rdBounds.maxY-bb.maxY)/(infoBg.rdBounds.maxY-infoBg.rdBounds.minY)*img.height);
+      const iy1=Math.min(img.height,(infoBg.rdBounds.maxY-bb.minY)/(infoBg.rdBounds.maxY-infoBg.rdBounds.minY)*img.height);
+      if(ix1>ix0&&iy1>iy0){
+        try{ctx.drawImage(img,ix0,iy0,ix1-ix0,iy1-iy0,rightX,topY,rightW,topH);}catch(e){console.warn("KLIC PNG preview:",e);}
+      }
+    }
+
+    for(const o of klicObjects||[]){
+      if(!o.geom?.length)continue;
+      ctx.beginPath();let started=false;
+      for(const p of o.geom){
+        const q=toXY(p);
+        if(!started){ctx.moveTo(q[0],q[1]);started=true;}else ctx.lineTo(q[0],q[1]);
+      }
+      if(!started)continue;
+      ctx.strokeStyle=klicKleur(o);ctx.lineWidth=2.5;ctx.globalAlpha=.9;
+      const status=String(o.status||"functional").toLowerCase();
+      ctx.setLineDash(status==="disused"?[16,5,3,5]:(status==="projected"?[3,10]:[]));
+      ctx.stroke();ctx.setLineDash([]);
+    }
+    const a=toXY(boreStart),z=toXY(boreEnd);
+    ctx.globalAlpha=1;ctx.strokeStyle="#e00000";ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(z[0],z[1]);ctx.stroke();
+    ctx.fillStyle="#e00000";ctx.font="bold 16px Arial";ctx.fillText("A. INTREDE",a[0]+8,a[1]-9);ctx.fillText("B. UITTREDE",z[0]+8,z[1]-9);
+    ctx.fillStyle="#fff";ctx.globalAlpha=.88;ctx.fillRect(rightX+7,topY+topH-29,310,23);ctx.globalAlpha=1;
+    ctx.fillStyle="#141414";ctx.font="bold 15px Arial";ctx.fillText("SITUATIE · KLIC",rightX+14,topY+topH-12);
+    ctx.restore();
+  }
+
+  drawSituationPreview();
+
+  // KLIC PNG laden zonder erop te wachten. Zodra hij binnen is, alleen het
+  // situatievak opnieuw tekenen. Het boorprofiel blijft altijd staan.
+  if(klicBackgroundInfo?.url){
+    const url=klicBackgroundInfo.url;
+    if(!window.__previewKlicImage || window.__previewKlicImage.__src!==url){
+      const img=new Image();img.__src=url;window.__previewKlicImage=img;
+      img.onload=()=>{if($("pdfPreviewCard")?.style.display!=="none") drawSituationPreview();};
+      img.onerror=()=>console.warn("KLIC achtergrond kan niet voor PDF-voorbeeld worden geladen.");
+      img.src=url;
+    }
+  }
+
+  // LENGTEPROFIEL: gebruik rechtstreeks het bestaande zichtbare profielcanvas.
+  // Hierdoor wordt de normale profieltekening niet opnieuw uitgevoerd en kan
+  // het preview-canvas de profielberekening niet meer beïnvloeden.
+  ctx.save();
+  ctx.fillStyle="#f8fafc";ctx.fillRect(rightX+2,profileY+2,rightW-4,profileH-4);
+  const pc=$("profile");
+  if(pc && pc.width>0 && pc.height>0){
+    const pr=pc.width/pc.height;
+    let pw=rightW-8,ph=pw/pr;
+    if(ph>profileH-8){ph=profileH-8;pw=ph*pr;}
+    const pxx=rightX+(rightW-pw)/2,pyy=profileY+(profileH-ph)/2;
+    try{ctx.drawImage(pc,pxx,pyy,pw,ph);}catch(e){
+      console.error("Profielcanvas preview:",e);
+      ctx.fillStyle="#c00000";ctx.font="bold 16px Arial";
+      ctx.fillText("Profielcanvas kon niet worden geplaatst",rightX+18,profileY+45);
+    }
+  } else {
+    ctx.fillStyle="#c00000";ctx.font="bold 16px Arial";
+    ctx.fillText("Boorprofiel is nog niet beschikbaar",rightX+18,profileY+45);
+  }
+  ctx.fillStyle="#fff";ctx.globalAlpha=.92;ctx.fillRect(rightX+7,profileY+7,315,23);ctx.globalAlpha=1;
+  ctx.fillStyle="#141414";ctx.font="bold 15px Arial";ctx.fillText("LENGTEPROFIEL",rightX+14,profileY+24);
+  if(evWarnings.length){
+    const ey=H-m-35;ctx.fillStyle="#fff1f1";ctx.strokeStyle="#d00000";ctx.lineWidth=2;ctx.fillRect(rightX+4,ey,rightW-8,27);ctx.strokeRect(rightX+4,ey,rightW-8,27);ctx.fillStyle="#c00000";ctx.font="bold 15px Arial";ctx.fillText("LET OP – EV-MELDING",rightX+12,ey+18);
+  }
+  ctx.restore();
+}
+
+async function choosePdfFolder(){
+  const st=$("pdfFolderStatus");
+  // De File System Access API werkt alleen in een secure context (HTTPS)
+  // en moet rechtstreeks vanuit een gebruikersactie worden gestart.
+  if(!window.isSecureContext || location.protocol==="file:"){
+    if(st) st.innerHTML="<b>PDF-map kiezen werkt alleen wanneer deze pagina via HTTPS wordt geopend.</b><br>Open de KLIC-app via je GitHub Pages-adres. Als je het HTML-bestand rechtstreeks opent, gebruikt de app de normale browserdownload.";
+    alert("PDF-map kiezen werkt niet wanneer dit HTML-bestand rechtstreeks vanaf de computer wordt geopend.\n\nOpen de KLIC-app via HTTPS (bijvoorbeeld GitHub Pages) en klik daarna opnieuw op 'Kies PDF-map'.\n\nDe knop 'PDF exporteren' blijft wel werken en slaat de PDF anders via de normale browserdownload op.");
+    return false;
+  }
+  if(typeof window.showDirectoryPicker!=="function"){
+    if(st) st.innerHTML="<b>Deze browser ondersteunt geen mapkeuze.</b> De normale browserdownload blijft beschikbaar.";
+    alert("Deze browser ondersteunt de rechtstreekse PDF-mapkeuze niet. De PDF wordt via de normale browserdownload opgeslagen.");
+    return false;
+  }
+  try{
+    const handle=await window.showDirectoryPicker({id:"klic-boorprofiel-pdf",mode:"readwrite",startIn:"downloads"});
+    if(!handle) return false;
+    window.__pdfDirectoryHandle=handle;
+    if(st) st.innerHTML="<b>PDF-map:</b> "+esc(handle.name)+". Nieuwe PDF's worden rechtstreeks in deze map opgeslagen.";
+    return true;
+  }catch(err){
+    if(err?.name==="AbortError") return false;
+    console.error("PDF-map kiezen:",err);
+    if(st) st.innerHTML="<b>PDF-map kon niet worden gekozen.</b> De normale browserdownload blijft beschikbaar.";
+    alert("De PDF-map kon niet worden gekozen: "+(err?.message||err));
+    return false;
+  }
+}
+
+async function savePdfBlobToChosenFolder(blob,filename){
+  const dir=window.__pdfDirectoryHandle;
+  if(!dir) return false;
+  try{
+    const fileHandle=await dir.getFileHandle(filename,{create:true});
+    const writable=await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    const st=$("pdfFolderStatus");
+    if(st) st.innerHTML="<b>PDF opgeslagen:</b> "+esc(dir.name)+" / "+esc(filename);
+    return true;
+  }catch(err){
+    console.error("PDF opslaan in gekozen map:",err);
+    const st=$("pdfFolderStatus");
+    if(st) st.innerHTML="<b>Opslaan in de gekozen map lukte niet.</b> De browserdownload wordt gebruikt.";
+    return false;
+  }
+}
+
+async function exportBoorprofielPDF(openPreview=false){
+  if(!boreStart||!boreEnd){alert("Plaats eerst een startpunt en eindpunt van de boring.");return;}
+  if(typeof window.jspdf==="undefined"||!window.jspdf.jsPDF){alert("De PDF-bibliotheek is nog niet geladen.");return;}
+  const btn=$("exportPdfBtn");const oldText=btn?btn.textContent:"";if(btn){btn.disabled=true;btn.textContent="PDF wordt gemaakt...";}
+  try{
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:"landscape",unit:"mm",format:"a4",compress:true});
+    const pageW=pdf.internal.pageSize.getWidth(),pageH=pdf.internal.pageSize.getHeight();
+    const m=5,gap=4,leftW=58,rightX=m+leftW+gap,rightW=pageW-rightX-m;
+    // Linkerkolom: doorsnede bovenaan, daaronder buisinfo.
+    pdf.setDrawColor(150,150,150);pdf.setLineWidth(.25);pdf.rect(m,m,leftW,pageH-2*m);
+    drawPdfBoreSection(pdf,m+3,m+3,leftW-6,62);
+    pdf.line(m+2,71,leftW+m-2,71);
+    drawPdfPipeInfo(pdf,m+3,74,leftW-6,55);
+    pdf.line(m+2,132,leftW+m-2,132);
+    drawPdfProjectInfo(pdf,m+3,135,leftW-6,45);
+
+    // Rechterboven: echte KLIC-topo uit de levering + KLIC-leidingen + boorlijn.
+    const sit=await drawSituationCanvas();
+    const topY=m+2, topH=78;
+    const imgRatio=sit.canvas.width/sit.canvas.height;
+    let sitW=rightW,sitH=sitW/imgRatio;
+    if(sitH>topH){sitH=topH;sitW=sitH*imgRatio;}
+    const sitX=rightX+(rightW-sitW)/2;
+    pdf.setDrawColor(120,120,120);pdf.rect(rightX,topY,rightW,topH);
+    pdf.addImage(sit.canvas.toDataURL("image/png"),"PNG",sitX,topY,sitW,sitH,undefined,"FAST");
+    const sitScaleRaw=sit.geoWidthM?pdfScaleDenom(sit.geoWidthM,sitW):null;
+    const sitScale=sitScaleRaw?Math.max(1,Math.round(sitScaleRaw)):null;
+    pdf.setFont("helvetica","bold");pdf.setFontSize(7);pdf.setTextColor(20,20,20);
+    pdf.text(`SITUATIE · SCHAAL 1:${sitScale||"—"}`,rightX+2,topY+topH-2);
+    // Schaalbalk 10 m, fysiek op de gekozen schaal.
+    if(sitScale){const barM=10,barMm=barM*1000/sitScale;if(barMm<rightW-10){const bx=rightX+rightW-barMm-5,by=topY+topH-7;pdf.setDrawColor(0,0,0);pdf.setLineWidth(.5);pdf.line(bx,by,bx+barMm,by);pdf.line(bx,by-1.5,bx,by+1.5);pdf.line(bx+barMm,by-1.5,bx+barMm,by+1.5);pdf.setFont("helvetica","normal");pdf.setFontSize(5.5);pdf.text("10 m",bx+barMm/2,by-2,{align:"center"});}}
+
+    // Rechteronder: bestaand boorprofiel, met expliciete schaalvermelding.
+    const profileY=topY+topH+5,profileH=pageH-profileY-m-3;
+    const canvas=$("profile");
+    const ratio=canvas.width/canvas.height;
+    let pw=rightW,ph=pw/ratio;if(ph>profileH){ph=profileH;pw=ph*ratio;}
+    const px=rightX+(rightW-pw)/2;
+    pdf.setDrawColor(120,120,120);pdf.rect(rightX,profileY,rightW,profileH);
+    pdf.addImage(canvas.toDataURL("image/png"),"PNG",px,profileY,pw,ph,undefined,"FAST");
+    const len=rdDistance(boreStart,boreEnd);
+    const profileScale=Math.max(1,Math.round((len*1000)/Math.max(1,pw)));
+    pdf.setFillColor(255,255,255);pdf.rect(rightX+2,profileY+2,58,7,"F");
+    pdf.setTextColor(20,20,20);pdf.setFont("helvetica","bold");pdf.setFontSize(7);pdf.text(`LENGTEPROFIEL · SCHAAL 1:${profileScale}`,rightX+3,profileY+7);
+
+    // EV-melding blijft nadrukkelijk zichtbaar in de PDF.
+    if(evWarnings.length){
+      const ey=profileY+profileH-18;
+      pdf.setFillColor(255,241,241);pdf.setDrawColor(208,0,0);pdf.rect(rightX+2,ey,rightW-4,14,"FD");
+      pdf.setTextColor(192,0,0);pdf.setFont("helvetica","bold");pdf.setFontSize(8);pdf.text("LET OP – EV-MELDING",rightX+5,ey+5);
+      pdf.setFont("helvetica","normal");pdf.setFontSize(6);
+      const evText=[...new Set(evWarnings.map(x=>`${x.owner} · ${x.type}${x.where==="start"?" · bij intrede":x.where==="end"?" · bij uittrede":" · op de boorlijn"}`))];
+      pdf.text(evText.slice(0,3),rightX+5,ey+9,{maxWidth:rightW-12});
+    }
+
+    const datum=new Date().toISOString().slice(0,10);
+    const safeAddress=(adres||"").replace(/[^a-z0-9 _-]/gi,"_").replace(/\s+/g,"_");
+    const filename=`KLIC_Boorprofiel${safeAddress?"_"+safeAddress:""}_${datum}.pdf`;
+    const blob=pdf.output("blob");
+    if(openPreview){
+      // Voorbeeld op het scherm blijft de stabiele canvas-preview.
+      showPdfPreview();
+    }else{
+      // Als nog geen map is gekozen, probeer die eerst te openen vanuit
+      // dezelfde gebruikersactie. Op lokale file://-pagina's valt dit
+      // automatisch terug naar de browserdownload.
+      if(!window.__pdfDirectoryHandle && window.isSecureContext && typeof window.showDirectoryPicker==="function") {
+        await choosePdfFolder();
+      }
+      const saved=await savePdfBlobToChosenFolder(blob,filename);
+      if(!saved) pdf.save(filename);
+    }
+  }catch(err){console.error(err);alert("Het boorprofiel kon niet naar PDF worden geëxporteerd: "+(err?.message||err));}
+  finally{if(btn){btn.disabled=false;btn.textContent=oldText;}}
+}
+
+async function loadKlic(file){
+  if(typeof JSZip==="undefined")throw new Error("ZIP-bibliotheek is niet geladen.");
+  $("klicStatus").textContent="KLIC wordt gelezen...";
+
+  const zip=await JSZip.loadAsync(file);
+  const names=Object.keys(zip.files);
+  const xmlName=names.find(n=>/GI_gebiedsinformatielevering.*\.xml$/i.test(n));
+
+  if(!xmlName)throw new Error("Geen GI_gebiedsinformatielevering XML gevonden in de ZIP.");
+
+  const xml=await zip.file(xmlName).async("text");
+  parseKlic(xml);
+  if(pdokBaseLayer) addGoogleBaseLayers(pdokBaseLayer);
+  await loadKlicBackground(zip,xml);
+  renderKlic();
+
+  const ownerCount=new Set(klicObjects.map(o=>o.owner).filter(x=>x&&x!=="Onbekend")).size;
+  $("klicStatus").innerHTML="<b>KLIC geladen:</b> "+klicObjects.length+" geometrische objecten. Netbeheerders herkend: "+ownerCount+". De kruisingen worden berekend in RD (EPSG:28992) ten opzichte van de gekozen start boring-einde boring-lijn.";
+  analyze();
+}
+
+function setup(){
+  initProjection();
+  initMap();
+  setTimeout(()=>{ if(pdokBaseLayer) addGoogleBaseLayers(pdokBaseLayer); },700);
+
+  $("defaultClearance").addEventListener("input",()=>{ crossings.forEach(o=>{ if(!o._customClearance) o.clearance=Number($("defaultClearance").value)||0; }); renderCrossings(); drawProfile(); });
+  $("pipeDiameter").addEventListener("change",()=>{
+    const custom=$("pipeDiameter").value==="custom";
+    $("pipeDiameterCustom").disabled=!custom;
+    drawProfile();
+  });
+  ["pipeCount","pipeMaterial","pipeDiameterCustom","pilotDiameter","reamDiameter"].forEach(id=>$(id).addEventListener("input",drawProfile));
+  ["entryAngle","exitAngle"].forEach(id=>$(id).addEventListener("change",drawProfile));
+  ["startDepth","endDepth"].forEach(id=>$(id).addEventListener("input",()=>{
+    const el=$(id);
+    if(el && Number(el.value)<0) el.value="0";
+    drawProfile();
+  }));
+  $("choosePdfFolderBtn")?.addEventListener("click",choosePdfFolder);
+  $("exportPdfBtn").addEventListener("click",exportBoorprofielPDF);
+  $("previewPdfBtn").addEventListener("click",()=>{
+    try{
+      showPdfPreview();
+    }catch(err){
+      console.error(err);
+      alert("Het PDF-voorbeeld kon niet worden opgebouwd: "+(err?.message||err));
+    }
+  });
+  $("closePdfPreviewBtn")?.addEventListener("click",()=>{
+    $("pdfPreviewCard").style.display="none";
+  });
+  const savedSvKey=localStorage.getItem("klic_google_streetview_key")||"";
+  if($("googleStreetViewKey")) $("googleStreetViewKey").value=savedSvKey;
+  if(savedSvKey && pdokBaseLayer) addGoogleBaseLayers(pdokBaseLayer);
+  if(boreStart && boreEnd) updateStreetViews();
+  $("fetchNapBtn").addEventListener("click",()=>fetchAhnTerrainProfile().catch(err=>{
+    console.error(err); $("napStatus").textContent="Fout bij ophalen NAP: "+err.message;
+  }));
+  $("maaiveldNap").addEventListener("input",()=>{ ahnTerrainLoaded=false; ahnProfile=[]; drawProfile(); });
+
+  $("clearBore").addEventListener("click",clearBore);
+
+  $("drop").addEventListener("click",()=>$("file").click());
+  $("file").addEventListener("change",e=>{
+    const f=e.target.files[0];
+    if(f)loadKlic(f).catch(err=>{
+      console.error(err);
+      $("klicStatus").textContent="Fout: "+err.message;
+    });
+  });
+
+  $("drop").addEventListener("dragover",e=>{
+    e.preventDefault();
+    $("drop").style.background="#eef4ff";
+  });
+  $("drop").addEventListener("dragleave",()=>$("drop").style.background="");
+  $("drop").addEventListener("drop",e=>{
+    e.preventDefault();
+    $("drop").style.background="";
+    const f=e.dataTransfer.files[0];
+    if(f)loadKlic(f).catch(err=>$("klicStatus").textContent="Fout: "+err.message);
+  });
+
+  if(map){
+    map.on("click",e=>{
+      const rd=wgsToRd(e.latlng.lat,e.latlng.lng);
+
+      if(!boreStart||boreEnd){
+        clearBore();
+        boreStart=rd;
+        startMarker=L.marker(e.latlng,{icon:L.divIcon({className:"bore-point-marker bore-point-start",html:"<span>✚</span>",iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map).bindTooltip("A. INTREDE",{permanent:true,offset:[0,-18]});
+        setKlicCrosshair(true);
+      }else{
+        boreEnd=rd;
+        endMarker=L.marker(e.latlng,{icon:L.divIcon({className:"bore-point-marker bore-point-end",html:"<span>✚</span>",iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map).bindTooltip("B. UITTREDE",{permanent:true,offset:[0,-18]});
+        boreLine=L.polyline([startMarker.getLatLng(),e.latlng],{color:"#ff0000",weight:4,opacity:0.95}).addTo(map);
+        $("length").value=rdDistance(boreStart,boreEnd).toFixed(1);
+        arcGeometry();
+        analyze();
+        updateEvWarnings();
+        updateStreetViews();
+        setKlicCrosshair(false);
+      }
+    });
+  }
+}
+
+document.addEventListener("DOMContentLoaded",setup);
+</script>
+</body>
+</html>
